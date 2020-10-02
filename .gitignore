@@ -1,0 +1,18 @@
+*.py[cod]
+__pycache__/
+
+*.so
+
+# Packages
+.Python
+*.egg
+*.egg-info
+dist
+
+pip-log.txt
+
+
+# Editors
+*~
+.*.swp
+.vscode
