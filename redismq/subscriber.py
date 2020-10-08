@@ -1,3 +1,7 @@
+"""
+Subscriber for RedisMQ
+"""
+
 class Subscriber(object):
     """
     Easy wrapper around subscribing
@@ -10,10 +14,8 @@ class Subscriber(object):
         self._channel = channel
         self._workerCallback = workerCallback
         self._die_after_message = die_after_message
-    
+
     def exit(self):
         """
         quits subscribing
         """
-        pass
-        pass
