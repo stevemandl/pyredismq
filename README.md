@@ -45,13 +45,19 @@ or from source:
 $ python setup.py install
 ```
 
+testing:
+
+```console
+python3 -m pytest -s
+```
+
 ## Getting Started
 
 RedisMQ needs to connect to an existing redis server, so you will need the address and port of the server you want to use. RedisMQ also stores global state in the redis server. By default the namespace used for global keys is rmq:*. If you need to change this so it does not conflict with other data stored in redis, the configuration parameter redismq_namespace should be set to something different.
 
 ## Examples
 
-Here are some examples of using the redislite module.
+Here are some examples of using the pyredismq module.
 
 ### Sending an unconfirmed message
 
@@ -76,7 +82,7 @@ From a Python shell we send a confirmed message:
 ```python
 >>> import asyncio
 >>> from redismq import Client
->>> def async sendAConfirmedMessage():
+>>> async def sendAConfirmedMessage():
 ...     mq_connection = await Client.connect('redis://127.0.0.1')
 ...     my_producer = mq_connection.producer('mystream')
 ...     response = await my_producer.addConfirmedMessage('Hello there! Let me know when you get this.')

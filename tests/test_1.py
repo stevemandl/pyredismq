@@ -3,6 +3,7 @@ test1.py
 """
 import asyncio
 import pytest
+from tests.utils import TEST_URL
 
 from redismq import Client
 
@@ -20,10 +21,10 @@ async def read_a_confirmed_message(my_consumer):
 @pytest.mark.asyncio
 async def test_send_and_read():
     'test sending a confirmed message and reading/confirming it'
-    p_connection = await Client.connect('redis://mq.emcs.cucloud.net')
+    p_connection = await Client.connect(TEST_URL)
     await p_connection.redis.delete('mystream')
     my_producer = await p_connection.producer('mystream')
-    q_connection = await Client.connect('redis://mq.emcs.cucloud.net')
+    q_connection = await Client.connect(TEST_URL)
     my_consumer = await q_connection.consumer('mystream', 'mygroup', 'consumer1')
     send_task = asyncio.create_task(send_a_confirmed_message(my_producer))
     recv_task = asyncio.create_task(read_a_confirmed_message(my_consumer))

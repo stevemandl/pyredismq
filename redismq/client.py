@@ -24,11 +24,13 @@ class Client(Logging):
         self._namespace = 'rmq'
 
     @classmethod
+    @FunctionLogging
     async def connect(cls, address, redismq_namespace: str = None):
         """
         use this instead of the default constructor
         """
         self = Client()
+        Client.connect.log_debug('connecting %s', address)
         self.redis = await aioredis.create_redis(address, encoding='utf-8')
         self.sub_redis = await aioredis.create_redis(address, encoding='utf-8')
         if redismq_namespace:
@@ -40,14 +42,13 @@ class Client(Logging):
         """
         use this to get a Producer
         """
-        print( asyncio.current_task())
         Client.producer.log_debug('producer %s', stream)
         return Producer(self, stream)
 
     @FunctionLogging
     async def consumer(
         self,
-        stream,
+        stream_name,
         group_name,
         consumer_id,
         claim_stale_messages=True,
@@ -57,21 +58,21 @@ class Client(Logging):
         use this to get a Consumer
         """
         try:
-            info = await self.redis.xinfo_groups(stream)
+            info = await self.redis.xinfo_groups(stream_name)
             Client.consumer.log_debug('xinfo %s', info)
         except aioredis.RedisError  as err:
-            Client.consumer.log_debug(err)
+            Client.consumer.log_debug('no existing stream %s', stream_name)
             info = []
-        if not stream in info:
+        if not any(e['name'] == group_name for e in info):
             await self.redis.xgroup_create(
-                stream,
+                stream_name,
                 group_name,
                 latest_id='$',
                 mkstream=True)
-            Client.consumer.log_debug('added group %s to stream %s ', group_name, stream)
+            Client.consumer.log_debug('added group %s to stream %s ', group_name, stream_name)
         return Consumer(
             self,
-            stream,
+            stream_name,
             group_name,
             consumer_id,
             claim_stale_messages,

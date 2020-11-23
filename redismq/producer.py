@@ -59,12 +59,12 @@ class Producer(Logging):
         a chance to listen.
         """
         Producer.addConfirmedMessage.log_debug(message)
-        response_channel = await self._unique_channel_id()
-        Producer.addConfirmedMessage.log_debug('response_channel %s', response_channel)
-        mapping = { 'message': message, 'response_channel': response_channel }
-        ( channel, ) = await self.client.sub_redis.subscribe(response_channel)
-        Producer.addConfirmedMessage.log_debug('channel %s', channel)
-        task = asyncio.create_task(self._resp_task(channel))
+        response_channel_id = await self._unique_channel_id()
+        Producer.addConfirmedMessage.log_debug('response_channel %s', response_channel_id)
+        mapping = { 'message': message, 'response_channel': response_channel_id }
+        ( response_channel, ) = await self.client.sub_redis.subscribe(response_channel_id)
+        Producer.addConfirmedMessage.log_debug('channel %s', response_channel)
+        task = asyncio.create_task(self._resp_task(response_channel))
         result = await self.client.redis.xadd(self.stream, mapping)
         Producer.addConfirmedMessage.log_debug('added message to stream %s, got %s', self.stream, result)
         return await task
