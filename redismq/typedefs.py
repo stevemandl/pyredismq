@@ -1,3 +1,3 @@
-from typing import ( Union, NewType )
+from typing import NewType
 
-url = NewType ('url', str )
+URL = NewType("URL", str)

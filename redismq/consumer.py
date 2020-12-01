@@ -1,85 +1,138 @@
 """
 Consumer for RedisMQ
 """
-from redismq.Debugging import FunctionLogging, Logging
+from __future__ import annotations
 
-class Consumer(Logging): # pylint: disable=too-few-public-methods
+from typing import TYPE_CHECKING, Any, Dict, Callable
+
+from .debugging import debugging
+
+if TYPE_CHECKING:
+    from .client import Client
+
+
+@debugging
+class Consumer:  # pylint: disable=too-few-public-methods
     """
     Consumes messages
     """
+
+    client: Client
+    stream_name: str
+    group_name: str
+    consumer_name: str
+    min_idle_time: int
+
+    log_debug: Callable[..., None]
+
     def __init__(
         self,
-        client,
-        stream,
-        groupName,
-        consumerName,
-        claim_stale_messages=True,
-        min_idle_time=60000,
-        scan_pending_on_start : bool=True) -> None:
+        client: Client,
+        stream_name: str,
+        group_name: str,
+        consumer_name: str,
+        min_idle_time: int = 60000,
+        # claim_stale_messages: bool = True,
+        # scan_pending_on_start: bool = True,
+    ) -> None:
         """
         default constructor
         """
         self.client = client
-        self.stream = stream
-        self.group_name = groupName
-        self.consumer_name = consumerName
-        self.claim_stale_messages = claim_stale_messages
+        self.stream_name = stream_name
+        self.group_name = group_name
+        self.consumer_name = consumer_name
         self.min_idle_time = min_idle_time
-        self.latest_ids = ['0',] if scan_pending_on_start else ['>',]
-        # TODO: set up worker to check for stale messages and claim them
 
-    @FunctionLogging
-    async def read(self):
+        # TODO: set up worker to check for stale messages and claim them
+        # self.claim_stale_messages = claim_stale_messages
+        # self.latest_id = "0" if scan_pending_on_start else ">"
+
+        self.latest_id = ">"
+
+    async def read(self) -> "Payload":
         """
-        read a message from the queue
+        Read a message from the stream.
         """
         args = {
-            'group_name': self.group_name, 
-            'consumer_name': self.consumer_name,
-            'streams': [self.stream, ],
-            'timeout': 0,
-            'count': 1,
-            'latest_ids': self.latest_ids,
-            'no_ack': False}
-        Consumer.read.log_debug('reading args=%s', args)
-        messages = await self.client.redis.xread_group(**args)
-        Consumer.read.log_debug('read messages %s', messages)
-        if len(messages) == 0:
-            if self.latest_ids is not ['>',]:
-                self.latest_ids = ['>',]
-                return await self.read()
-            # (else)
-            raise Exception('xread_group got empty list even though requesting special id ">".')
-        # (else)
+            "group_name": self.group_name,
+            "consumer_name": self.consumer_name,
+            "streams": [self.stream_name],
+            "timeout": 0,
+            "count": 1,
+            "latest_ids": [self.latest_id],
+            "no_ack": False,
+        }
+        Consumer.log_debug("read %r", args)
+
+        with (await self.client.redis) as connection:
+            while True:
+                messages = await connection.xread_group(**args)
+                Consumer.log_debug("    - messages: %r", messages)
+                if messages:
+                    break
+
         (stream, msg_id, payload) = messages[0]
         payload_dict = dict(payload)
-        Consumer.read.log_debug('stream %s, id %s, payload %s', stream, msg_id, payload_dict)
+        Consumer.log_debug(
+            "    - stream %s, id %s, payload %s", stream, msg_id, payload_dict
+        )
         return self.Payload(self, msg_id, payload_dict)
 
     class Payload:
         """
-        Encapsulates the payload wrapped around a message and exposes an ack() function
+        Encapsulates the payload wrapped around a message and exposes an ack()
+        function.
         """
-        def __init__(self, consumer, msg_id, serialized_payload):
-            self.message = serialized_payload['message']
+
+        def __init__(
+            self, consumer: "Consumer", msg_id: str, payload_dict: Dict[str, Any]
+        ) -> None:
+            self.message = payload_dict["message"]
             self.consumer = consumer
             self.msg_id = msg_id
-            if 'response_channel' in serialized_payload:
-                self.response_channel = serialized_payload['response_channel']
-            else:
-                self.response_channel = None
+            self.response_channel = payload_dict.get("response_channel", None)
 
-        @FunctionLogging
-        async def ack(self, response):
+        async def ack(self, response: str) -> None:
             """
-            acks the message on the stream and pulishes the reponse on the responseChannel,
-            if defined
+            Acks the message on the stream and publishes the response on the
+            responseChannel, if provided.
             """
-            Consumer.Payload.ack.log_debug(response)
-            await self.consumer.client.redis.xack(
-                self.consumer.stream,
-                self.consumer.group_name,
-                self.msg_id)
-            if self.response_channel is not None:
-                message = {"message": response}
-                await self.consumer.client.redis.publish_json(self.response_channel, message)
+            Consumer.log_debug("ack %r", response)
+
+            Consumer.log_debug("    - msg_id: %r", self.msg_id)
+            with (await self.consumer.client.redis) as connection:
+                await connection.xack(
+                    self.consumer.stream_name, self.consumer.group_name, self.msg_id
+                )
+                if self.response_channel is not None:
+                    Consumer.log_debug(
+                        "    - response channel: %r", self.response_channel
+                    )
+
+                    payload = {"message": response}
+                    Consumer.log_debug("    - payload: %r", payload)
+
+                    await connection.publish_json(self.response_channel, payload)
+
+        async def nack(self, error: str) -> None:
+            """
+            Acks the message on the stream and publishes the error response
+            on the responseChannel, if provided.
+            """
+            Consumer.log_debug("nack %r", error)
+
+            Consumer.log_debug("    - msg_id: %r", self.msg_id)
+            with (await self.consumer.client.redis) as connection:
+                await connection.xack(
+                    self.consumer.stream_name, self.consumer.group_name, self.msg_id
+                )
+                if self.response_channel is not None:
+                    Consumer.log_debug(
+                        "    - response channel: %r", self.response_channel
+                    )
+
+                    payload = {"error": error}
+                    Consumer.log_debug("    - payload: %r", payload)
+
+                    await connection.publish_json(self.response_channel, payload)

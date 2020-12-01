@@ -1,12 +1,19 @@
 """
 Subscriber for RedisMQ
 """
+from typing import Any
 
-class Subscriber(object):
+from .debugging import Logging
+
+
+class Subscriber(Logging):
     """
     Easy wrapper around subscribing
     """
-    def __init__(self, client, channel, workerCallback, die_after_message=False):
+
+    def __init__(
+        self, client: Any, channel, workerCallback, die_after_message: bool = False
+    ) -> None:
         """
         default constructor
         """
@@ -15,7 +22,8 @@ class Subscriber(object):
         self._workerCallback = workerCallback
         self._die_after_message = die_after_message
 
-    def exit(self):
+    def exit(self) -> None:
         """
         quits subscribing
         """
+        return None
