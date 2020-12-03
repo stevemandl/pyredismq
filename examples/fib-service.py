@@ -18,29 +18,29 @@ producer: Producer
 
 
 @debugging
-async def fib(payload: Consumer.Payload) -> None:
+async def fib(payload: Consumer.Payload) -> int:
     "test reading a confirmed message"
     global producer
 
-    try:
-        n = int(payload.message)
-        if n < 0:
-            raise ValueError("positive integers only")
-    except ValueError as err:
-        return await payload.nack(str(err))
+    n = payload.message
+    if n < 0:
+        return await payload.ack(-1)
 
     fib.log_debug("    - n: %r", n)  # type: ignore[attr-defined]
 
     if n == 0:
-        response = "0"
+        response = 0
     elif n == 1:
-        response = "1"
+        response = 1
     else:
-        part1 = asyncio.create_task(producer.addConfirmedMessage(str(n - 1)))
-        part2 = asyncio.create_task(producer.addConfirmedMessage(str(n - 2)))
+        part1 = asyncio.create_task(producer.addConfirmedMessage(n - 1))
+        part2 = asyncio.create_task(producer.addConfirmedMessage(n - 2))
         await asyncio.gather(part1, part2)
 
-        response = str(int(part1.result()["message"]) + int(part2.result()["message"]))
+        fib.log_debug("    - part1: %r", part1)  # type: ignore[attr-defined]
+        fib.log_debug("    - part2: %r", part2)  # type: ignore[attr-defined]
+
+        response = part1.result() + part2.result()
 
     fib.log_debug("    - response: %r", response)  # type: ignore[attr-defined]
 
