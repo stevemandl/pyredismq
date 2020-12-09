@@ -63,9 +63,9 @@ class Client:
         stream_name: str,
         group_name: str,
         consumer_id: str,
-        min_idle_time: int = 60000,
-        # claim_stale_messages: bool = True,
         # scan_pending_on_start: bool = True,
+        # claim_stale_messages: bool = True,
+        # min_idle_time: int = 60000,
     ) -> Consumer:
         """
         Use this to get a Consumer
@@ -92,7 +92,7 @@ class Client:
             stream_name,
             group_name,
             consumer_id,
-            min_idle_time,
-            # claim_stale_messages,
             # scan_pending_on_start,
+            # claim_stale_messages,
+            # min_idle_time,
         )
