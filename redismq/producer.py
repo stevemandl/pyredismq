@@ -69,7 +69,7 @@ class Producer:
             try:
                 response = await response_channel.get_json()
             except ValueError as err:
-                respone = err
+                response = err
 
         except asyncio.CancelledError as err:
             Producer.log_debug("    - canceled %s", response_channel_id)
