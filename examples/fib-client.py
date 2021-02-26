@@ -16,8 +16,8 @@ async def main() -> None:
     Main method
     """
     main.log_debug("starting...")  # type: ignore[attr-defined]
-    mq = await Client.connect("redis://localhost")
-    producer = await mq.producer("testStream")
+    mq = await Client.connect("redis://mq.emcs.cucloud.net")
+    producer = await mq.producer("fibStream")
     while True:
         try:
             line = input("? ")

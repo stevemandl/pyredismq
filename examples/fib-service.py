@@ -41,7 +41,7 @@ async def fib(payload: Consumer.Payload) -> int:
             fib.log_debug("    - part1: %r", part1)  # type: ignore[attr-defined]
             fib.log_debug("    - part2: %r", part2)  # type: ignore[attr-defined]
 
-            response = part1.result() + part2.result()
+            response = part1.result()['message'] + part2.result()['message']
 
         fib.log_debug("    - response: %r", response)  # type: ignore[attr-defined]
     except Exception as err:
@@ -61,9 +61,9 @@ async def main() -> None:
 
     consumer_name = sys.argv[1]
 
-    mq = await Client.connect("redis://localhost")
-    consumer = await mq.consumer("testStream", "testGroup", consumer_name)
-    producer = await mq.producer("testStream")
+    mq = await Client.connect("redis://mq.emcs.cucloud.net")
+    consumer = await mq.consumer("fibStream", "fibGroup", consumer_name)
+    producer = await mq.producer("fibStream")
     while True:
         payload = await consumer.read()
         main.log_debug("    - payload: %r", payload)  # type: ignore[attr-defined]

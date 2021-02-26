@@ -185,5 +185,5 @@ class Consumer:  # pylint: disable=too-few-public-methods
                     Consumer.log_debug(
                         "    - response channel: %r", self.response_channel
                     )
-
-                    await connection.publish_json(self.response_channel, response)
+                    mResponse = {"message": response}
+                    await connection.publish_json(self.response_channel, mResponse)

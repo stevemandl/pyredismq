@@ -51,7 +51,7 @@ class Producer:
         response_channel_id = "%s:response.%d" % (self.client.namespace, uid)
         Producer.log_debug("    - response_channel_id: %r", response_channel_id)
 
-        response = None
+        response = {}
         try:
             # subscribe to the channel
             (response_channel,) = await self.client.redis.subscribe(response_channel_id)
@@ -69,11 +69,13 @@ class Producer:
             try:
                 response = await response_channel.get_json()
             except ValueError as err:
-                response = err
+                response["message"] = "JSON Decoding Error"
+                response["err"] = err
 
         except asyncio.CancelledError as err:
             Producer.log_debug("    - canceled %s", response_channel_id)
-            response = err
+            response["message"] = "Cancelled Error"
+            response["err"] = err
         finally:
             Producer.log_debug("    - finally %s", response_channel_id)
             await self.client.redis.unsubscribe(response_channel)
