@@ -42,13 +42,14 @@ class Producer:
         self.stream_name = stream_name
         self.channel_key = "%s:responseid" % client.namespace
 
-    async def _resp_task(self, payload: Dict[str, Any]) -> Any:
+    async def _resp_task(self, payload: Dict[str, Any], response_channel_id: str) -> Any:
         """
         utility method for a confirmed request
         """
-        # get a unique channel identifier
-        uid = await self.client.redis.incr(self.channel_key)
-        response_channel_id = "%s:response.%d" % (self.client.namespace, uid)
+        if response_channel_id is None:
+            # get a unique channel identifier
+            uid = await self.client.redis.incr(self.channel_key)
+            response_channel_id = "%s:response.%d" % (self.client.namespace, uid)
         Producer.log_debug("    - response_channel_id: %r", response_channel_id)
 
         response = {}
@@ -83,7 +84,7 @@ class Producer:
         return response
 
     # pylint: disable=invalid-name
-    def addUnconfirmedMessage(self, message: Any) -> AnyFuture:
+    def addUnconfirmedMessage(self, message: Any, response_channel_id: str = None) -> AnyFuture:
         """
         Return a task that adds an unconfirmed message to the message queue.
         """
@@ -91,14 +92,15 @@ class Producer:
 
         # JSON encode the message
         payload = {"message": json.dumps(message)}
-
+        if response_channel_id is not None:
+            payload["response_channel"] = response_channel_id
         # create a task to add it to the stream
         future = self.client.redis.xadd(self.stream_name, payload)
 
         return cast(AnyFuture, future)
 
     # pylint: disable=invalid-name
-    def addConfirmedMessage(self, message: Any) -> AnyFuture:
+    def addConfirmedMessage(self, message: Any, response_channel_id: str = None) -> AnyFuture:
         """
         Return a task that adds a confirmed message to the message queue and
         waits for the response.
@@ -109,6 +111,6 @@ class Producer:
         payload = {"message": json.dumps(message)}
 
         # create a task to add it to the stream
-        future = self._resp_task(payload)
+        future = self._resp_task(payload, response_channel_id)
 
         return cast(AnyFuture, future)

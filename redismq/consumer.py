@@ -169,12 +169,12 @@ class Consumer:  # pylint: disable=too-few-public-methods
                     )
                 )
 
-        async def ack(self, response: Any) -> None:
+        async def ack(self, response: Any = None, error: Any = None) -> None:
             """
             Acks the message on the stream and publishes the response on the
             responseChannel, if provided.
             """
-            Consumer.log_debug("ack %r", response)
+            Consumer.log_debug("ack %r %r", response, error)
 
             Consumer.log_debug("    - msg_id: %r", self.msg_id)
             with (await self.consumer.client.redis) as connection:
@@ -185,5 +185,5 @@ class Consumer:  # pylint: disable=too-few-public-methods
                     Consumer.log_debug(
                         "    - response channel: %r", self.response_channel
                     )
-                    mResponse = {"message": response}
+                    mResponse = {"message": response, "error": error}
                     await connection.publish_json(self.response_channel, mResponse)
