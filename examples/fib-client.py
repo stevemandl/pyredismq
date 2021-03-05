@@ -25,7 +25,18 @@ async def main() -> None:
             break
         except EOFError:
             break
-        result = await producer.addConfirmedMessage(int(line))
+        response = await producer.addConfirmedMessage(int(line))
+        print(f"response: {response!r}")
+
+        # interpret as a function result or an exception
+        error = response.get("error", None)
+        if error:
+            raise Exception(error)
+
+        # the "message" in the response is the value of the "response"
+        # parameter when ack() function was called
+        result = response["message"]
+
         print(f"result: {result!r}")
         print("")
 

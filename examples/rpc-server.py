@@ -11,6 +11,8 @@ import asyncio
 import inspect
 import json
 
+from typing import Dict
+
 from redismq.debugging import debugging
 from redismq import Client, Consumer, Producer
 
@@ -61,10 +63,10 @@ async def dispatch(payload: Consumer.Payload) -> None:
         dispatch.log_debug("    - result: %r", result)  # type: ignore[attr-defined]
 
         # success
-        await payload.ack({"result": result})
+        await payload.ack(response=result)
 
     except Exception as err:
-        return await payload.ack({"error": str(err)})
+        return await payload.ack(error=str(err))
 
 
 @debugging

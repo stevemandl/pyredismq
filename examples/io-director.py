@@ -36,7 +36,7 @@ async def dispatch(payload: Consumer.Payload) -> None:
     function.
     """
     dispatch.log_debug("dispatch %r", payload)  # type: ignore[attr-defined]
-    global function_map
+    global mq
 
     try:
         request = payload.message
@@ -60,22 +60,18 @@ async def dispatch(payload: Consumer.Payload) -> None:
 
         # extract the protocol stream name from the definition
         protocol_stream_name = object_definitions[object_name]["protocol"]
-        dispatch.log_debug("    - protocol_stream_name: %r", protocol_stream_name)  # type: ignore[attr-defined]
 
-        # JSON encode the message and forward the response channel
-        forward_payload = {
-            "message": json.dumps(request),
-            "response_channel": payload.response_channel,
-        }
-        dispatch.log_debug("    - forward_payload: %r", forward_payload)  # type: ignore[attr-defined]
+        # create a producer for the stream
+        producer = await mq.producer(protocol_stream_name)
+        dispatch.log_debug("    - producer: %r", producer)
 
-        # put the request into the stream
-        message_id: str = await consumer.client.redis.xadd(
-            protocol_stream_name, forward_payload
+        # forward the request along, this will look like a confirmed service
+        # request to the server
+        await producer.addUnconfirmedMessage(
+            message=request, response_channel_id=payload.response_channel,
         )
-        dispatch.log_debug("    - message_id: %r", message_id)  # type: ignore[attr-defined]
 
-        # kill the response channel
+        # kill the response channel so no message goes back to the client
         payload.response_channel = None
 
         # half way to success
@@ -91,7 +87,7 @@ async def main() -> None:
     Main method
     """
     main.log_debug("starting...")  # type: ignore[attr-defined]
-    global consumer
+    global mq
 
     director_name = sys.argv[1]
 

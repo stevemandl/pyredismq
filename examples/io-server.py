@@ -50,7 +50,7 @@ async def dispatch(payload: Consumer.Payload) -> None:
     function.
     """
     dispatch.log_debug("dispatch %r", payload)  # type: ignore[attr-defined]
-    global function_map
+    global mq, function_map
 
     try:
         request = payload.message
@@ -72,10 +72,10 @@ async def dispatch(payload: Consumer.Payload) -> None:
         dispatch.log_debug("    - result: %r", result)  # type: ignore[attr-defined]
 
         # success
-        await payload.ack({"result": result})
+        await payload.ack(response=result)
 
     except Exception as err:
-        return await payload.ack({"error": str(err)})
+        return await payload.ack(error=str(err))
 
 
 @debugging

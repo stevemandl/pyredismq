@@ -25,14 +25,16 @@ async def dispatch(fn_name: str, *args: Any, **kwargs: Any) -> Any:
 
     # send the request, wait for the response
     response = await producer.addConfirmedMessage({"fn": fn_name, **kwargs})
+    # print(f"response: {response!r}")
 
     # interpret as a function result or an exception
-    if "result" in response:
-        return response["result"]
-    elif "error" in response:
-        raise Exception(response["error"])
-    else:
-        raise RuntimeError("response must include 'result' or 'error'")
+    error = response.get("error", None)
+    if error:
+        raise Exception(error)
+
+    # the "message" in the response is the value of the "response"
+    # parameter when ack() function was called
+    return response["message"]
 
 
 #
