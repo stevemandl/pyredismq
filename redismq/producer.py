@@ -42,7 +42,9 @@ class Producer:
         self.stream_name = stream_name
         self.channel_key = "%s:responseid" % client.namespace
 
-    async def _resp_task(self, payload: Dict[str, Any], response_channel_id: str) -> Any:
+    async def _resp_task(
+        self, payload: Dict[str, Any], response_channel_id: str
+    ) -> Any:
         """
         utility method for a confirmed request
         """
@@ -84,7 +86,9 @@ class Producer:
         return response
 
     # pylint: disable=invalid-name
-    def addUnconfirmedMessage(self, message: Any, response_channel_id: str = None) -> AnyFuture:
+    def addUnconfirmedMessage(
+        self, message: Any, response_channel_id: str = None
+    ) -> AnyFuture:
         """
         Return a task that adds an unconfirmed message to the message queue.
         """
@@ -100,7 +104,9 @@ class Producer:
         return cast(AnyFuture, future)
 
     # pylint: disable=invalid-name
-    def addConfirmedMessage(self, message: Any, response_channel_id: str = None) -> AnyFuture:
+    def addConfirmedMessage(
+        self, message: Any, response_channel_id: str = None
+    ) -> AnyFuture:
         """
         Return a task that adds a confirmed message to the message queue and
         waits for the response.

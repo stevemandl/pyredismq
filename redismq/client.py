@@ -4,7 +4,6 @@ Client for RedisMQ
 
 from __future__ import annotations
 
-import asyncio
 import aioredis  # type: ignore
 
 from typing import Any, Callable, Optional

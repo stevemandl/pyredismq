@@ -4,13 +4,29 @@ Remote Procedure Call Client
 This application uses a producer to generate a "confirmed" request to the
 stream for the server and waits for the response.
 """
+import os
 import asyncio
-import json
 
 from typing import Any
 
 from redismq.debugging import debugging
 from redismq import Client, Producer
+
+
+def getenv(key: str) -> str:
+    """Get the value of an environment variable and throw an error if the value
+    isn't set."""
+    value = os.getenv(key)
+    if value is None:
+        raise RuntimeError("environment variable: %r" % (key,))
+    return value
+
+
+# settings
+EMCS_REDIS_HOST = getenv("EMCS_REDIS_HOST")
+EMCS_REDIS_PORT = int(getenv("EMCS_REDIS_PORT"))
+EMCS_REDIS_DB = int(getenv("EMCS_REDIS_DB"))
+
 
 mq: Client
 producer: Producer
@@ -56,7 +72,9 @@ async def main() -> None:
     global mq, producer
 
     main.log_debug("starting...")  # type: ignore[attr-defined]
-    mq = await Client.connect("redis://localhost")
+    mq = await Client.connect(
+        f"redis://{EMCS_REDIS_HOST}:{EMCS_REDIS_PORT}/{EMCS_REDIS_DB}"
+    )
     producer = await mq.producer("testStream")
     while True:
         try:

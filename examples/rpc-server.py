@@ -6,20 +6,36 @@ Fibonacci number.
 """
 from __future__ import annotations
 
+import os
 import sys
 import asyncio
 import inspect
-import json
 
-from typing import Dict
+from typing import Any, Dict
 
 from redismq.debugging import debugging
-from redismq import Client, Consumer, Producer
+from redismq import Client, Consumer
 
 mq: Client
 consumer: Consumer
 
-function_map: Dict[str,] = {}
+
+def getenv(key: str) -> str:
+    """Get the value of an environment variable and throw an error if the value
+    isn't set."""
+    value = os.getenv(key)
+    if value is None:
+        raise RuntimeError("environment variable: %r" % (key,))
+    return value
+
+
+# settings
+EMCS_REDIS_HOST = getenv("EMCS_REDIS_HOST")
+EMCS_REDIS_PORT = int(getenv("EMCS_REDIS_PORT"))
+EMCS_REDIS_DB = int(getenv("EMCS_REDIS_DB"))
+
+
+function_map: Dict[str, Any] = {}
 
 
 def register_function(fn):
@@ -75,11 +91,13 @@ async def main() -> None:
     Main method
     """
     main.log_debug("starting...")  # type: ignore[attr-defined]
-    global consumer, producer
+    global consumer
 
     consumer_name = sys.argv[1]
 
-    mq = await Client.connect("redis://localhost")
+    mq = await Client.connect(
+        f"redis://{EMCS_REDIS_HOST}:{EMCS_REDIS_PORT}/{EMCS_REDIS_DB}"
+    )
     consumer = await mq.consumer("testStream", "testGroup", consumer_name)
     while True:
         payload = await consumer.read()

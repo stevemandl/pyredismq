@@ -13,16 +13,32 @@ names), the group name (probably 'servers') and consumer name (like 'server-a',
 """
 from __future__ import annotations
 
+import os
 import sys
 import asyncio
 import inspect
-import json
 import random
 
 from typing import Any, Callable, Dict
 
 from redismq.debugging import debugging
-from redismq import Client, Consumer, Producer
+from redismq import Client, Consumer
+
+
+def getenv(key: str) -> str:
+    """Get the value of an environment variable and throw an error if the value
+    isn't set."""
+    value = os.getenv(key)
+    if value is None:
+        raise RuntimeError("environment variable: %r" % (key,))
+    return value
+
+
+# settings
+EMCS_REDIS_HOST = getenv("EMCS_REDIS_HOST")
+EMCS_REDIS_PORT = int(getenv("EMCS_REDIS_PORT"))
+EMCS_REDIS_DB = int(getenv("EMCS_REDIS_DB"))
+
 
 mq: Client
 consumer: Consumer
@@ -84,13 +100,15 @@ async def main() -> None:
     Main method
     """
     main.log_debug("starting...")  # type: ignore[attr-defined]
-    global consumer, producer
+    global consumer
 
     stream_name = sys.argv[1]
     group_name = sys.argv[2]
     consumer_name = sys.argv[3]
 
-    mq = await Client.connect("redis://localhost")
+    mq = await Client.connect(
+        f"redis://{EMCS_REDIS_HOST}:{EMCS_REDIS_PORT}/{EMCS_REDIS_DB}"
+    )
     consumer = await mq.consumer(stream_name, group_name, consumer_name)
     while True:
         payload = await consumer.read()

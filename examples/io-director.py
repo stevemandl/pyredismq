@@ -11,21 +11,42 @@ for running mutilple directors.
 """
 from __future__ import annotations
 
+import os
 import sys
 import asyncio
-import inspect
-import json
 
 from redismq.debugging import debugging
 from redismq import Client, Consumer
+
+
+def getenv(key: str) -> str:
+    """Get the value of an environment variable and throw an error if the value
+    isn't set."""
+    value = os.getenv(key)
+    if value is None:
+        raise RuntimeError("environment variable: %r" % (key,))
+    return value
+
+
+# settings
+EMCS_REDIS_HOST = getenv("EMCS_REDIS_HOST")
+EMCS_REDIS_PORT = int(getenv("EMCS_REDIS_PORT"))
+EMCS_REDIS_DB = int(getenv("EMCS_REDIS_DB"))
+
 
 mq: Client
 consumer: Consumer
 
 
 object_definitions = {
-    "oat": {"name": "oat", "protocol": "protocol-a",},
-    "rh": {"name": "rh", "protocol": "protocol-b",},
+    "oat": {
+        "name": "oat",
+        "protocol": "protocol-a",
+    },
+    "rh": {
+        "name": "rh",
+        "protocol": "protocol-b",
+    },
 }
 
 
@@ -68,7 +89,8 @@ async def dispatch(payload: Consumer.Payload) -> None:
         # forward the request along, this will look like a confirmed service
         # request to the server
         await producer.addUnconfirmedMessage(
-            message=request, response_channel_id=payload.response_channel,
+            message=request,
+            response_channel_id=payload.response_channel,
         )
 
         # kill the response channel so no message goes back to the client
@@ -91,7 +113,9 @@ async def main() -> None:
 
     director_name = sys.argv[1]
 
-    mq = await Client.connect("redis://localhost")
+    mq = await Client.connect(
+        f"redis://{EMCS_REDIS_HOST}:{EMCS_REDIS_PORT}/{EMCS_REDIS_DB}"
+    )
     consumer = await mq.consumer("testStream", "testGroup", director_name)
     while True:
         payload = await consumer.read()

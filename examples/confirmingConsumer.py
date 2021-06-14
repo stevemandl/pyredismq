@@ -1,6 +1,7 @@
 """
 Confirming Consumer
 """
+import os
 import asyncio
 import time
 
@@ -9,6 +10,21 @@ from redismq import Client, Consumer
 
 count = 0
 start = time.perf_counter()
+
+
+def getenv(key: str) -> str:
+    """Get the value of an environment variable and throw an error if the value
+    isn't set."""
+    value = os.getenv(key)
+    if value is None:
+        raise RuntimeError("environment variable: %r" % (key,))
+    return value
+
+
+# settings
+EMCS_REDIS_HOST = getenv("EMCS_REDIS_HOST")
+EMCS_REDIS_PORT = int(getenv("EMCS_REDIS_PORT"))
+EMCS_REDIS_DB = int(getenv("EMCS_REDIS_DB"))
 
 
 @debugging
@@ -34,7 +50,9 @@ async def main() -> None:
     Main method
     """
     main.log_debug("starting...")  # type: ignore[attr-defined]
-    mq = await Client.connect("redis://localhost")
+    mq = await Client.connect(
+        f"redis://{EMCS_REDIS_HOST}:{EMCS_REDIS_PORT}/{EMCS_REDIS_DB}"
+    )
     consumer = await mq.consumer("testStream", "testGroup", "pyconsumer1")
     while True:
         await read_and_confirm(consumer)
