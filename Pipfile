@@ -4,11 +4,11 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+pytest = "*"
+pytest-asyncio = "*"
 
 [packages]
 aioredis = "*"
-pytest = "*"
-pytest-asyncio = "*"
 
 [requires]
 python_version = "3.8"

@@ -48,7 +48,8 @@ $ python setup.py install
 testing:
 
 ```console
-python3 -m pytest -s
+piipenv install --dev
+pipenv run pytest
 ```
 
 ## Getting Started
