@@ -48,7 +48,7 @@ $ python setup.py install
 testing:
 
 ```console
-piipenv install --dev
+pipenv install --dev
 pipenv run pytest
 ```
 

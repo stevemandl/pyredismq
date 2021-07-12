@@ -1,5 +1,5 @@
 """
-test1.py
+test_confirmed.py
 """
 import pytest  # type: ignore
 
@@ -39,8 +39,5 @@ async def test_send_and_read() -> None:
     send_task.done()
     recv_task.cancel()
 
-    p_connection.redis.close()
-    await p_connection.redis.wait_closed()
-
-    q_connection.redis.close()
-    await q_connection.redis.wait_closed()
+    await p_connection.close()
+    await q_connection.close()

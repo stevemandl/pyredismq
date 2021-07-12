@@ -4,8 +4,10 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-pytest = "*"
+pytest = {version=">=6.2"}
 pytest-asyncio = "*"
+pytest-cov = {version=">=2.12"}
+pylint = "*"
 
 [packages]
 aioredis = "*"

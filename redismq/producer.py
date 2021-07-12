@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, cast
 
@@ -29,6 +30,7 @@ class Producer:
     client: Client
     stream_name: str
     channel_key: str
+    id: int
 
     log_debug: Callable[..., None]
 
@@ -41,6 +43,7 @@ class Producer:
         self.client = client
         self.stream_name = stream_name
         self.channel_key = "%s:responseid" % client.namespace
+        self.id = time.time_ns()
 
     async def _resp_task(
         self, payload: Dict[str, Any], response_channel_id: str
@@ -120,3 +123,12 @@ class Producer:
         future = self._resp_task(payload, response_channel_id)
 
         return cast(AnyFuture, future)
+
+    # pylint: disable=invalid-name
+    def destroy( self ) -> None:
+        """ destroy- stops this producer from working. This is automatically called when
+            client.dispose_producer() is called with this producer
+        """
+        self.client = None
+        self.stream_name = None
+        Producer.log_debug("producer id %r destroyed", self.id)

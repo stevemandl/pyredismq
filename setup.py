@@ -1,6 +1,12 @@
+# setup.py
+
+import pathlib
 import setuptools
 
-with open("README.md", "r") as fh:
+# The directory containing this file
+HERE = pathlib.Path(__file__).parent
+
+with open(HERE / "README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
@@ -12,11 +18,12 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/pypa/redismq",
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(exclude=("tests",)),
+    install_requires=['aioredis'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
 )
