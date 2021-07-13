@@ -10,14 +10,14 @@ with open(HERE / "README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="redismq-smandl",
+    name="redismq",
     version="0.0.1rc1",
     author="Steve Mandl",
     author_email="sjm34@cornell.edu",
     description="Message Queueing for Redis Streams",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/pypa/redismq",
+    url="https://github.com/stevemandl/pyredismq",
     packages=setuptools.find_packages(exclude=("tests",)),
     install_requires=['aioredis'],
     extras_require={
