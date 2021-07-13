@@ -24,9 +24,9 @@ def getenv(key: str) -> str:
 
 
 # settings
-EMCS_REDIS_HOST = getenv("EMCS_REDIS_HOST")
-EMCS_REDIS_PORT = int(getenv("EMCS_REDIS_PORT"))
-EMCS_REDIS_DB = int(getenv("EMCS_REDIS_DB"))
+REDIS_HOST = getenv("REDIS_HOST")
+REDIS_PORT = int(getenv("REDIS_PORT"))
+REDIS_DB = int(getenv("REDIS_DB"))
 
 
 mq: Client
@@ -41,7 +41,7 @@ async def fib(payload: Consumer.Payload) -> None:
 
     try:
         n = payload.message
-        if n < 0:
+        if n < 0:EMCS_
             return await payload.ack(-1)
 
         fib.log_debug("    - n: %r", n)  # type: ignore[attr-defined]
@@ -79,7 +79,7 @@ async def main() -> None:
     consumer_name = sys.argv[1]
 
     mq = await Client.connect(
-        f"redis://{EMCS_REDIS_HOST}:{EMCS_REDIS_PORT}/{EMCS_REDIS_DB}"
+        f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
     )
     consumer = await mq.consumer("fibStream", "fibGroup", consumer_name)
     producer = await mq.producer("fibStream")
