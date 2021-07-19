@@ -1,6 +1,7 @@
 # RedisMQ
 [![PyPI version](https://badge.fury.io/py/redismq.svg)](https://badge.fury.io/py/redismq)
 [![Build Status](https://travis-ci.com/stevemandl/pyredismq.svg?branch=main)](https://travis-ci.com/stevemandl/pyredismq)
+[![codecov](https://codecov.io/gh/stevemandl/pyredismq/branch/main/graph/badge.svg?token=LZHN8D2FRB)](https://codecov.io/gh/stevemandl/pyredismq)
 ## Description
 
 RedisMQ uses the redis stream data structure to effect a message queue. The stream key name is the id of the message queue. 
@@ -14,7 +15,7 @@ RedisMQ libraries for Python and Javascript are available.
 
 ## Requirements
 
-The RedisMQ module requires Python 3.7 or higher.
+The RedisMQ module requires Python 3.8 or higher.
 
 ### Prerequisites
 
@@ -70,7 +71,7 @@ From a Python shell we send an unconfirmed message:
 >>> from redismq import Client
 >>> async def sendAMessage():
 ...     mq_connection = await Client.connect('redis://127.0.0.1')
-...     my_producer = mq_connection.producer('mystream')
+...     my_producer = await mq_connection.producer('mystream')
 ...     print( await my_producer.addUnconfirmedMessage('Hello there!'))
 ...
 >>> asyncio.run(sendAMessage())
@@ -86,7 +87,7 @@ From a Python shell we send a confirmed message:
 >>> from redismq import Client
 >>> async def sendAConfirmedMessage():
 ...     mq_connection = await Client.connect('redis://127.0.0.1')
-...     my_producer = mq_connection.producer('mystream')
+...     my_producer = await mq_connection.producer('mystream')
 ...     response = await my_producer.addConfirmedMessage('Hello there! Let me know when you get this.')
 ...     print('Got confirmation', response)
 ...
@@ -99,38 +100,16 @@ From a Python shell we consume a message:
 
 ```python
 >>> from redismq import Client
->>> def async readAndConfirmMessage():
->>>     mq_connection = Client.connect('redis://127.0.0.1')
->>>     my_consumer = mq_connection.consumer('mystream', 'mygroup', 'consumer1')
+>>> async def readAndConfirmMessage():
+>>>     mq_connection = await Client.connect('redis://127.0.0.1')
+>>>     my_consumer = await mq_connection.consumer('mystream', 'mygroup', 'consumer1')
 >>>     payload = await my_consumer.read()
 >>>     print('Got message', payload.message)
 >>>     # here you can do something with the message
 >>>     # the response passed to ack() is optional, 
 >>>     # and ignored if the original message was unconfirmed:
 >>>     resp = 'I got your message' if payload.responseChannel else ''
->>>     await payload.ack(resp) 
-```
-
-### Publishing a message
-
-From a Python shell we publish a message:
-
-```python
->>> from redismq import Client
->>> mq_connection = Client.connect('redis://127.0.0.1')
->>> mq_connection.publish('mychannel', 'This is a message for anyone listening')
-```
-
-### Subscribing to messages
-
-From a Python shell we subscribe to messages:
-
-```python
->>> from redismq import Client
->>> mq_connection = Client.connect('redis://127.0.0.1')
->>> def handleMessage(msg):
->>>     print('Subscriber got a message', msg)
->>> my_subscriber = mq_connection.subscriber('mychannel', handleMessage)
+>>>     await payload.ack(resp)
 ```
 ## More Information
 
