@@ -24,3 +24,4 @@ async def test_same_producer_twice() -> None:
     your_producer = await mq_connection.producer("mystream")
     assert my_producer is your_producer
     await mq_connection.close()
+    

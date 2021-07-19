@@ -2,10 +2,13 @@
 __pycache__/
 
 *.so
-.env
+*.env
+*.log
+*input.txt
 
 # Packages
 .Python
+build/
 *.egg
 *.egg-info
 dist
