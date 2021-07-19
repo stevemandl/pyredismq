@@ -1,9 +1,13 @@
 language: python
 python:
   - "3.8"
+services:
+  - redis
 install:
 - pip install pipenv
 - pipenv install --dev
+script:
+  - pipenv run pytest
 deploy:
   provider: pypi
   username: __token__
