@@ -1,5 +1,6 @@
 # RedisMQ
 [![PyPI version](https://badge.fury.io/py/redismq.svg)](https://badge.fury.io/py/redismq)
+[![Build Status](https://travis-ci.com/stevemandl/pyredismq.svg?branch=main)](https://travis-ci.com/stevemandl/pyredismq)
 ## Description
 
 RedisMQ uses the redis stream data structure to effect a message queue. The stream key name is the id of the message queue. 
