@@ -1,18 +1,18 @@
 language: python
 python:
-  - "3.8"
+- '3.8'
 services:
-  - redis
+- redis
 install:
 - pip install pipenv
 - pipenv install --dev
 script:
-  - pipenv run pytest
+- pipenv run pytest
 deploy:
   provider: pypi
   username: __token__
   password:
-    secure: Q4nYLvPQI89qc04JPgVqlHuXji5jdnXG9IXC6bFS0PgSNu2h3y08rAg5yKgXE9bWPpbrn5Z+cmBixpOO3xW9KeKx3CVwdVbFcPAJ2LI6sapjV2FwQx8iGb2TpR3ZZUCImE5Vk85IzMLr2Cd3jogngwM2YcwGi2CCyV/cf/JBUivTJDGhIm5UQakN/WtrPsS2/cL11m5t6XmsdXLTG1BAlUDrLySh36HSY4mRxpsgYOqhhJenzZuyHUkDGbFPohaPrXsbr4QgPRB4sB8JJGuXFE6BnVqE3Ke+Bk8w5TTOePZHbcB7NUXGCYMEyxo6Zpxxg89KxqvsQu450cE+vdz9Hu1VG5xoDB7G8sdEFw36dLJCOIyVYKNnLk86v9cFk+gu1uN7wsygNu6rp6whzK1LHhyfC43Nxqg/0JtTVUn+0vOd/87/lKXokIvoGV5PcSdiYkmCfLUSxXsG7WzrkZJ3chU1vHTrF5Evgr9KS+0VAXvanzorUo8dU258TKG3won7kFfDogrDUPpUZjMKPS5YtRwc2JK6MvGgpCGpe4NEnCAJELEWMmccx3JogPk+EDSsqK1Q+7XV47KbRFcye67mp+60C416nkBmB7irzJj2w1ASp1wIh7yASP3DDfo08T9v+IGymYAz9uc28HCx+QY5TsEyI+TmGALyMAjrHqdDMEc=
+    secure: EkU3mQJpIn7TrJKw9YElCPatygqgc1GCqDETU6T/zvh85GYqZ0BihKOvzuTu5D7n+Ka7a/F2WxIOXc1Npi1c7wx6XvtJ1lcQi+kkpuzdlkXfI0b5s1qkKbwcvL6csEQ0XZXxMSqjzgG13jhpB+yOvDoKgMCs4u2Ia+it1DE3fiNyIvO2XZZr0O6yykHXzeaYnQQ3aDLJWeDRGs1idsJdIqwVi3nB8A80xwchsdzDAFQ/faQkKIy6rJ+b/EwyvweHuO386J2DP4Y1HAPzoCCQFszH919+crw46mM0KdFsDQBEf8Exph4DX9YBv1Neo/yiyUQw9HM49FkXzlXXlRq3YbrK0elVNnZbhu08VsYDDuW3U0PnD0WH8uK7x3L8aFFonl0gz/up5fi94dTqPXhc19sUfxX7RZFhdgxLwZwMaaSVRBztkH+J7VXoRs1iKZ9Nn9nUVF/mF64q6HsfFoqXsSHoByZWgHqb2gabVYtTAbvt8QOTcdk80oQ+Gl4Q2QDJxPSJ15WAJ6UuUA632XB0/e8htABSadY2mFGp4tWNP0ePpo3u6793OgWFRE60EAyy46ZFSz01iz9m5SV7/c/3IzvSNt7dujrj78nQOcQkcK+Xye0GtlXhM/+IM8cLMxutsPZTDlhBAy6TLOY1uqbV8rlUQNJHnpWpt5sk+d360DY=
   on:
     tags: true
     branch: main
