@@ -6,6 +6,7 @@ __pycache__/
 *.log
 *input.txt
 .coverage
+coverage.xml
 
 # Packages
 .Python

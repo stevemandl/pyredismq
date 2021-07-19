@@ -10,7 +10,7 @@ install:
 script:
 - pipenv run pytest
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+  - codecov
 deploy:
   provider: pypi
   username: __token__
