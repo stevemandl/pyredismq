@@ -11,7 +11,7 @@ with open(HERE / "README.md", "r") as fh:
 
 setuptools.setup(
     name="redismq",
-    version="1.0.2",
+    version="1.0.3",
     author="Steve Mandl",
     author_email="sjm34@cornell.edu",
     description="Message Queueing for Redis Streams",
