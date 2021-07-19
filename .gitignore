@@ -5,6 +5,7 @@ __pycache__/
 *.env
 *.log
 *input.txt
+.coverage
 
 # Packages
 .Python
