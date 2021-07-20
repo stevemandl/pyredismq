@@ -2,6 +2,7 @@
 [![PyPI version](https://badge.fury.io/py/redismq.svg)](https://badge.fury.io/py/redismq)
 [![Build Status](https://travis-ci.com/stevemandl/pyredismq.svg?branch=main)](https://travis-ci.com/stevemandl/pyredismq)
 [![codecov](https://codecov.io/gh/stevemandl/pyredismq/branch/main/graph/badge.svg?token=LZHN8D2FRB)](https://codecov.io/gh/stevemandl/pyredismq)
+[![Documentation Status](https://readthedocs.org/projects/pyredismq/badge/?version=latest)](https://pyredismq.readthedocs.io/en/latest/?badge=latest)
 ## Description
 
 RedisMQ uses the redis stream data structure to effect a message queue. The stream key name is the id of the message queue. 
@@ -60,7 +61,7 @@ RedisMQ needs to connect to an existing redis server, so you will need the addre
 
 ## Examples
 
-Here are some examples of using the pyredismq module.
+Here are some examples of using the pyredismq module. See [more examples](https://github.com/stevemandl/pyredismq/tree/main/examples) here.
 
 ### Sending an unconfirmed message
 
