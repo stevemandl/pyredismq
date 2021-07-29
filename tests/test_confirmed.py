@@ -46,7 +46,7 @@ async def test_send_and_read() -> None:
     await p_connection.close()
     await q_connection.close()
 
-@pytest.mark.timeout(10)
+@pytest.mark.execution_timeout(10)
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_slow_send_and_read() -> None:
     "test sending a slow confirmed message and reading/confirming it"
@@ -74,4 +74,6 @@ async def test_close_consumer() -> None:
     recv_task = asyncio.create_task(read_a_confirmed_message(my_consumer))
     close_task = asyncio.create_task(close_a_consumer(my_consumer))
     await asyncio.gather(recv_task, close_task)
+    closed_payload = await my_consumer.read()
+    assert closed_payload.message['error'] == 'closed'
     await mq_connection.close()

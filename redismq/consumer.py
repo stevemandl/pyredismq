@@ -67,7 +67,7 @@ class Consumer:  # pylint: disable=too-few-public-methods
         Read a message from the stream.
         """
         Consumer.log_debug("read")
-        closed_payload = self.Payload(self, 0, {'message': 'closed'})
+        closed_payload = self.Payload(self, 0, {'message': '{"error": "closed"}'})
         if not self.ready:
             return closed_payload
 
