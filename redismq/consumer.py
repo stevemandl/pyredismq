@@ -52,7 +52,7 @@ class Consumer:  # pylint: disable=too-few-public-methods
         # by default just read new messages that haven't been delivered
         self.latest_id = b">"
         self.ready = True
-        self.xread_timeout = 5
+        self.xread_timeout = 5000
 
     # close()
     def close(self) -> None:
@@ -71,14 +71,13 @@ class Consumer:  # pylint: disable=too-few-public-methods
         if not self.ready:
             return closed_payload
 
-        connection = await self.client.redis
         if self.scan_pending_on_start:
             (
                 pending_count,
                 min_id,
                 max_id,
                 pending_consumers,
-            ) = await connection.xpending(self.stream_name, self.group_name)
+            ) = await self.client.redis.xpending(self.stream_name, self.group_name)
             if pending_count:
                 Consumer.log_debug(
                     f"    - pending summary {self.stream_name!r}: {pending_count!r}, \
@@ -92,7 +91,7 @@ class Consumer:  # pylint: disable=too-few-public-methods
                             f"    - pending messages for {pending_consumer!r}"
                         )
 
-                    pending_messages = await connection.xpending(
+                    pending_messages = await self.client.redis.xpending(
                         self.stream_name,
                         self.group_name,
                         b"-",
@@ -111,7 +110,7 @@ class Consumer:  # pylint: disable=too-few-public-methods
                                 delivered {delivered!r}"
                         )
                         if self.claim_stale_messages:
-                            retcode = await connection.xclaim(
+                            retcode = await self.client.redis.xclaim(
                                 self.stream_name,
                                 self.group_name,
                                 self.consumer_name,
@@ -126,26 +125,27 @@ class Consumer:  # pylint: disable=too-few-public-methods
 
             # assume we'll get caught up
             self.scan_pending_on_start = False
-        # only loop if ready, recheck periodically
-        while self.ready:
-            Consumer.log_debug("    - latest_id: %r", self.latest_id)
+        with await self.client.redis as conn:
+            # only loop if ready, recheck periodically
+            while self.ready:
+                Consumer.log_debug("    - latest_id: %r redis: %r", self.latest_id, self.client.redis)
 
-            args = {
-                "group_name": self.group_name,
-                "consumer_name": self.consumer_name,
-                "streams": [self.stream_name],
-                "timeout": self.xread_timeout,
-                "count": 1,
-                "latest_ids": [self.latest_id],
-                "no_ack": False,
-            }
-            messages = await connection.xread_group(**args)
-            Consumer.log_debug("    - messages: %r", messages)
-            if messages:
-                break
+                args = {
+                    "group_name": self.group_name,
+                    "consumer_name": self.consumer_name,
+                    "streams": [self.stream_name],
+                    "timeout": self.xread_timeout,
+                    "count": 1,
+                    "latest_ids": [self.latest_id],
+                    "no_ack": False,
+                }
+                messages = await conn.xread_group(**args)
+                Consumer.log_debug("    - messages: %r", messages)
+                if messages:
+                    break
 
-            # loop around again, read the next new message
-            self.latest_id = b">"
+                # loop around again, read the next new message
+                self.latest_id = b">"
 
         if not self.ready:
             return closed_payload
@@ -171,7 +171,7 @@ class Consumer:  # pylint: disable=too-few-public-methods
         def __init__(
             self, consumer: "Consumer", msg_id: str, payload_dict: Dict[str, Any]
         ) -> None:
-            Consumer.log_debug("__init__ %r %r", msg_id, payload_dict)
+            Consumer.log_debug("Payload __init__ %r %r", msg_id, payload_dict)
 
             self.consumer = consumer
             self.msg_id = msg_id
@@ -191,16 +191,17 @@ class Consumer:  # pylint: disable=too-few-public-methods
             Acks the message on the stream and publishes the response on the
             responseChannel, if provided.
             """
-            Consumer.log_debug("ack %r %r", response, error)
+            Consumer.log_debug("Payload ack %r %r", response, error)
 
-            Consumer.log_debug("    - msg_id: %r", self.msg_id)
-            with (await self.consumer.client.redis) as connection:
-                await connection.xack(
-                    self.consumer.stream_name, self.consumer.group_name, self.msg_id
+            Consumer.log_debug("Payload     - msg_id: %r", self.msg_id)
+            await self.consumer.client.redis.xack(
+                self.consumer.stream_name, self.consumer.group_name, self.msg_id
+            )
+            Consumer.log_debug("Payload     - xack complete")
+            if self.response_channel is not None:
+                Consumer.log_debug(
+                    "Payload     - response channel: %r", self.response_channel
                 )
-                if self.response_channel is not None:
-                    Consumer.log_debug(
-                        "    - response channel: %r", self.response_channel
-                    )
-                    m_response = {"message": response, "error": error}
-                    await connection.publish_json(self.response_channel, m_response)
+                m_response = {"message": response, "error": error}
+                await self.consumer.client.redis.publish_json(self.response_channel, m_response)
+                Consumer.log_debug("Payload     - published json")

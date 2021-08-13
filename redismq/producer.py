@@ -58,33 +58,34 @@ class Producer:
         Producer.log_debug("    - response_channel_id: %r", response_channel_id)
 
         response = {}
-        try:
-            # subscribe to the channel
-            (response_channel,) = await self.client.redis.subscribe(response_channel_id)
-            Producer.log_debug("    - response_channel: %r", response_channel)
-
-            # pack it into the request payload
-            payload["response_channel"] = response_channel_id
-
-            # put the request into the stream
-            message_id: str = await self.client.redis.xadd(self.stream_name, payload)
-            Producer.log_debug("    - message_id: %r", message_id)
-
-            # wait for the response to come back
-            await response_channel.wait_message()
+        with await self.client.redis as sub_redis:
             try:
-                response = await response_channel.get_json()
-            except ValueError as err:
-                response["message"] = "JSON Decoding Error"
-                response["err"] = err
+                # subscribe to the channel
+                (response_channel,) = await sub_redis.subscribe(response_channel_id)
+                Producer.log_debug("    - response_channel: %r", response_channel)
 
-        except asyncio.CancelledError as err:
-            Producer.log_debug("    - canceled %s", response_channel_id)
-            response["message"] = "Cancelled Error"
-            response["err"] = err
-        finally:
-            Producer.log_debug("    - finally %s", response_channel_id)
-            await self.client.redis.unsubscribe(response_channel)
+                # pack it into the request payload
+                payload["response_channel"] = response_channel_id
+
+                # put the request into the stream
+                message_id: str = await self.client.redis.xadd(self.stream_name, payload)
+                Producer.log_debug("    - message_id: %r", message_id)
+
+                # wait for the response to come back
+                await response_channel.wait_message()
+                try:
+                    response = await response_channel.get_json()
+                except ValueError as err:
+                    response["message"] = "JSON Decoding Error"
+                    response["err"] = err
+
+            except asyncio.CancelledError as err:
+                Producer.log_debug("    - canceled %s", response_channel_id)
+                response["message"] = "Cancelled Error"
+                response["err"] = err
+            finally:
+                Producer.log_debug("    - finally %s", response_channel_id)
+                await sub_redis.unsubscribe(response_channel_id)
 
         return response
 
