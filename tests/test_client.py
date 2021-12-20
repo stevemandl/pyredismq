@@ -1,10 +1,11 @@
 """
-test_client.py
+Test Client
 """
-import asyncio
+
 import pytest  # type: ignore
 from tests.utils import TEST_URL  # type: ignore
-from redismq import Client, Producer, Consumer
+from redismq import Client
+
 
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_client_connect() -> None:
@@ -12,11 +13,13 @@ async def test_client_connect() -> None:
     p_connection = await Client.connect(TEST_URL)
     await p_connection.close()
 
+
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_client_barf() -> None:
     "test client with invalid URL should throw"
     with pytest.raises(OSError):
         await Client.connect("redis://bogus")
+
 
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_multiple_client_close() -> None:
@@ -26,6 +29,7 @@ async def test_multiple_client_close() -> None:
     await q_connection.close()
     await p_connection.close()
 
+
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_client_close_twice() -> None:
     "client closed twice should throw"
@@ -33,4 +37,3 @@ async def test_client_close_twice() -> None:
     await p_connection.close()
     with pytest.raises(RuntimeError):
         await p_connection.close()
-
