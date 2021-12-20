@@ -1,11 +1,27 @@
 """
-test_confirmed.py
+Test Confirmed Messages
 """
 import asyncio
 import pytest  # type: ignore
 from tests.utils import TEST_URL  # type: ignore
 
 from redismq import Client, Producer, Consumer
+
+
+@pytest.fixture
+def event_loop():
+    """
+    This special event loop fixture overriding the default one in pytest-asyncio
+    allows canceled tasks a chance to process the CancelledError that is thrown
+    into the task, otherwise the tests will pass but it generates "Task was
+    destroyed but it is pending!" messages when the loop is stopped.
+
+    https://docs.python.org/3/library/asyncio-task.html#asyncio.Task.cancel
+    """
+    loop = asyncio.get_event_loop()
+    yield loop
+    loop.call_soon(loop.stop)
+    loop.run_forever()
 
 
 async def send_a_confirmed_message(my_producer: Producer, delay: int = 0) -> None:
@@ -23,22 +39,23 @@ async def read_a_confirmed_message(my_consumer: Consumer) -> None:
     resp = "I got your message" if payload.response_channel else "no response"
     await payload.ack(resp)
 
+
 async def ack_confirmed_messages(my_consumer: Consumer) -> None:
     "ack confirmed messages"
     while True:
-        payload = await my_consumer.read()
-        await payload.ack("Acknowledged")
+        try:
+            payload = await my_consumer.read()
+            await payload.ack("Acknowledged")
+        except Exception as err:
+            print(f"ack_confirmed_messages exception: {err}")
+            raise
 
-async def close_a_consumer(my_consumer: Consumer) -> None:
-    "close consumer"
-    await asyncio.sleep(1)
-    my_consumer.close()
 
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_send_and_read() -> None:
     "test sending a confirmed message and reading/confirming it"
     p_connection = await Client.connect(TEST_URL)
-    await p_connection.redis.delete("mystream")
+    await p_connection.connection_pool.delete("mystream")
     my_producer = await p_connection.producer("mystream")
     q_connection = await Client.connect(TEST_URL)
     my_consumer = await q_connection.consumer("mystream", "mygroup", "consumer1")
@@ -46,61 +63,47 @@ async def test_send_and_read() -> None:
     send_task = asyncio.create_task(send_a_confirmed_message(my_producer))
     recv_task = asyncio.create_task(read_a_confirmed_message(my_consumer))
     await asyncio.gather(send_task, recv_task)
-    send_task.done()
     recv_task.cancel()
 
     await p_connection.close()
     await q_connection.close()
+
 
 @pytest.mark.execution_timeout(10)
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_slow_send_and_read() -> None:
     "test sending a slow confirmed message and reading/confirming it"
     p_connection = await Client.connect(TEST_URL)
-    await p_connection.redis.delete("mystream")
+    await p_connection.connection_pool.delete("mystream")
     my_producer = await p_connection.producer("mystream")
     q_connection = await Client.connect(TEST_URL)
     my_consumer = await q_connection.consumer("mystream", "mygroup", "consumer1")
-    my_consumer.xread_timeout = 1
 
     send_task = asyncio.create_task(send_a_confirmed_message(my_producer, 5))
     recv_task = asyncio.create_task(read_a_confirmed_message(my_consumer))
     await asyncio.gather(send_task, recv_task)
-    send_task.done()
     recv_task.cancel()
 
     await p_connection.close()
     await q_connection.close()
+
 
 @pytest.mark.execution_timeout(20)
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_multiple_confirmed() -> None:
     "test many confirmed messages"
     p_connection = await Client.connect(TEST_URL)
-    await p_connection.redis.delete("mystream")
+    await p_connection.connection_pool.delete("mystream")
     my_producer = await p_connection.producer("mystream")
+
     q_connection = await Client.connect(TEST_URL)
     my_consumer = await q_connection.consumer("mystream", "mygroup", "consumer1")
-    my_consumer.xread_timeout = 1
 
     ack_task = asyncio.create_task(ack_confirmed_messages(my_consumer))
-    for i in range(20):
-        response = await my_producer.addConfirmedMessage(f"message {i}" )
+    for i in range(10):
+        response = await my_producer.addConfirmedMessage(f"message {i}")
         assert response["message"] == "Acknowledged"
     ack_task.cancel()
+
     await p_connection.close()
     await q_connection.close()
-
-@pytest.mark.execution_timeout(10)
-@pytest.mark.asyncio  # type: ignore[misc]
-async def test_close_consumer() -> None:
-    "test close consumer"
-    mq_connection = await Client.connect(TEST_URL)
-    my_consumer = await mq_connection.consumer("mystream", "mygroup", "consumer1")
-    recv_task = asyncio.create_task(read_a_confirmed_message(my_consumer))
-    close_task = asyncio.create_task(close_a_consumer(my_consumer))
-    await asyncio.gather(recv_task, close_task)
-    closed_payload = await my_consumer.read()
-    assert closed_payload.message['error'] == 'closed'
-    await mq_connection.close()
-
