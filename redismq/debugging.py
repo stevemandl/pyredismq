@@ -2,8 +2,6 @@
 Debugging Module
 """
 
-import os
-import sys
 import logging
 
 from typing import (
@@ -16,27 +14,6 @@ from typing import (
     Optional,
     cast,
 )
-
-# set the level of the root logger
-_root = logging.getLogger()  # pylint: disable=invalid-name
-_LOG_LEVEL = "WARNING"
-if os.environ.get("LOG"):
-    _LOG_LEVEL = os.environ["LOG"].upper()
-_NUMERIC_LEVEL = getattr(logging, _LOG_LEVEL, None)
-if not isinstance(_NUMERIC_LEVEL, int):
-    raise ValueError("Invalid log level: %s" % _LOG_LEVEL)
-_root.setLevel(_NUMERIC_LEVEL)
-
-# add a stream handler for warnings and up
-hdlr = logging.StreamHandler(stream=sys.stderr)
-hdlr.setLevel(_NUMERIC_LEVEL)
-hdlr.setFormatter(logging.Formatter("%(levelname)s:%(name)s %(message)s"))
-_root.addHandler(hdlr)
-_root.debug("log level %s", _LOG_LEVEL)
-del hdlr
-
-# module level logger
-_log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 # types
 FuncType = Callable[..., Any]
@@ -60,29 +37,30 @@ def debugging(obj: FuncTypeVar) -> FuncTypeVar:
 # pylint: disable=bad-continuation
 @debugging
 def create_log_handler(
-    logger: Union[str, logging.Logger] = "",
+    logger: Union[logging.Logger, str, None] = None,
     handler: Optional[logging.StreamHandler] = None,
-    level: int = logging.DEBUG,
+    level: Union[int, str] = logging.DEBUG,
 ) -> None:
     """
     Add a stream handler with our custom formatter to a logger.
     """
     logger_ref: logging.Logger
 
+    # find a reference to the logger
     if isinstance(logger, logging.Logger):
         logger_ref = logger
 
     elif isinstance(logger, str):
-        # check for root
-        if not logger:
-            logger_ref = _log
-
         # check for a valid logger name
-        elif logger not in logging.Logger.manager.loggerDict:  # type: ignore
+        if logger not in logging.Logger.manager.loggerDict:  # type: ignore
             raise RuntimeError("not a valid logger name: %r" % (logger,))
 
         # get the logger
         logger_ref = logging.getLogger(logger)
+
+    elif logger is None:
+        # get the root logger
+        logger_ref = logging.getLogger(None)
 
     else:
         raise RuntimeError("not a valid logger reference: %r" % (logger,))
@@ -97,6 +75,13 @@ def create_log_handler(
 
     # add it to the logger
     logger_ref.addHandler(handler)
+
+    # find the level if it is a name
+    if isinstance(level, str):
+        try:
+            level = getattr(logging, level.upper())
+        except:
+            raise ValueError(f"not a logging level name: {level}")
 
     # make sure the logger has at least this level
     logger_ref.setLevel(level)
