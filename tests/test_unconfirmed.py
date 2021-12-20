@@ -1,5 +1,5 @@
 """
-test_unconfirmed.py
+Test Unconfirmed Messages
 """
 import pytest  # type: ignore
 
@@ -16,6 +16,7 @@ async def test_send_an_unconfirmed_message() -> None:
     print("Got message ID", response)
     await mq_connection.close()
 
+
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_same_producer_twice() -> None:
     "test same producer"
@@ -24,4 +25,3 @@ async def test_same_producer_twice() -> None:
     your_producer = await mq_connection.producer("mystream")
     assert my_producer is your_producer
     await mq_connection.close()
-    
