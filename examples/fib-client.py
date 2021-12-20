@@ -32,9 +32,7 @@ async def main() -> None:
     Main method
     """
     main.log_debug("starting...")  # type: ignore[attr-defined]
-    mq = await Client.connect(
-        f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
-    )
+    mq = await Client.connect(f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
     producer = await mq.producer("fibStream")
     while True:
         try:
