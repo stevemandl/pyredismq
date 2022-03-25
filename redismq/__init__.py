@@ -5,7 +5,7 @@ RedisMQ
 import os
 import logging
 
-__version__ = "1.2"
+__version__ = "1.3"
 
 _log = logging.getLogger(__name__)
 

@@ -137,7 +137,7 @@ class Consumer:  # pylint: disable=too-few-public-methods
                 "streams": {self.stream_name: latest_id},
             }
             try:
-                messages = await self.client.connection_pool.xreadgroup(**args)
+                messages = await self.client.redis.xreadgroup(**args)
                 Consumer.log_debug("    - messages: %r", messages)
             except Exception as err:
                 Consumer.log_debug("    - xreadgroup exception: %r", err)
@@ -198,7 +198,7 @@ class Payload:
         except json.decoder.JSONDecodeError:
             Payload.log_debug("    - unable to decode message, log this event")
             asyncio.ensure_future(
-                self.consumer.client.connection_pool.xack(
+                self.consumer.client.redis.xack(
                     self.consumer.stream_name, self.consumer.group_name, self.msg_id
                 )
             )
@@ -216,7 +216,7 @@ class Payload:
         Payload.log_debug("ack response=%r error=%r", response, error)
 
         Payload.log_debug("    - msg_id: %r", self.msg_id)
-        await self.consumer.client.connection_pool.xack(
+        await self.consumer.client.redis.xack(
             self.consumer.stream_name, self.consumer.group_name, self.msg_id
         )
         Payload.log_debug("    - xack complete")
@@ -224,7 +224,7 @@ class Payload:
         if self.response_channel is not None:
             Payload.log_debug("    - response channel: %r", self.response_channel)
             m_response = {"message": response, "error": error}
-            await self.consumer.client.connection_pool.publish(
+            await self.consumer.client.redis.publish(
                 self.response_channel, json.dumps(m_response)
             )
             Payload.log_debug("    - published json")

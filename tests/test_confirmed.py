@@ -55,7 +55,7 @@ async def ack_confirmed_messages(my_consumer: Consumer) -> None:
 async def test_send_and_read() -> None:
     "test sending a confirmed message and reading/confirming it"
     p_connection = await Client.connect(TEST_URL)
-    await p_connection.connection_pool.delete("mystream")
+    await p_connection.redis.delete("mystream")
     my_producer = await p_connection.producer("mystream")
     q_connection = await Client.connect(TEST_URL)
     my_consumer = await q_connection.consumer("mystream", "mygroup", "consumer1")
@@ -74,7 +74,7 @@ async def test_send_and_read() -> None:
 async def test_slow_send_and_read() -> None:
     "test sending a slow confirmed message and reading/confirming it"
     p_connection = await Client.connect(TEST_URL)
-    await p_connection.connection_pool.delete("mystream")
+    await p_connection.redis.delete("mystream")
     my_producer = await p_connection.producer("mystream")
     q_connection = await Client.connect(TEST_URL)
     my_consumer = await q_connection.consumer("mystream", "mygroup", "consumer1")
@@ -93,7 +93,7 @@ async def test_slow_send_and_read() -> None:
 async def test_multiple_confirmed() -> None:
     "test many confirmed messages"
     p_connection = await Client.connect(TEST_URL)
-    await p_connection.connection_pool.delete("mystream")
+    await p_connection.redis.delete("mystream")
     my_producer = await p_connection.producer("mystream")
 
     q_connection = await Client.connect(TEST_URL)

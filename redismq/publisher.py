@@ -53,11 +53,11 @@ class Publisher:
         # publish on the ctor channels plus any extras
         pub_channels = self.channels + channels
 
-        numsub = await self.client.connection_pool.pubsub_numsub(*pub_channels)
+        numsub = await self.client.redis.pubsub_numsub(*pub_channels)
         Publisher.log_debug("    - numsub: %r", numsub)
 
         # send a copy to each stream
         for channel, subscriber_count in numsub:
             if subscriber_count:
-                await self.client.connection_pool.publish(channel, payload)
+                await self.client.redis.publish(channel, payload)
                 Publisher.log_debug("    - published: %r", channel)

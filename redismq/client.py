@@ -5,7 +5,7 @@ Client for RedisMQ
 from __future__ import annotations
 
 import asyncio
-import aioredis  # type: ignore
+from redis import asyncio as aioredis  # type: ignore[attr-defined]
 
 from typing import Any, Callable, Dict, Set, List, Optional
 
@@ -33,7 +33,7 @@ class Client:
 
     status: str
     namespace: str
-    connection_pool: Any
+    redis: Any
 
     payloads: Set[Any]
     payloads_updated: asyncio.Condition
@@ -73,13 +73,13 @@ class Client:
         client.status = "connecting"
 
         # create a connection pool
-        client.connection_pool = aioredis.from_url(
+        client.redis = aioredis.from_url(
             address, max_connections=10, decode_responses=True
         )
-        Client.log_debug("    - connection_pool: %s", client.connection_pool)
+        Client.log_debug("    - redis: %s", client.redis)
 
         # try to ping it
-        rslt = await client.connection_pool.ping()
+        rslt = await client.redis.ping()
         Client.log_debug("    - ping: %r", rslt)
 
         client.status = "ready"
@@ -121,7 +121,8 @@ class Client:
         # wait for the event that says no more pending
         Client.log_debug(f"    - payloads: {self.payloads}")
         await self.payloads_event.wait()
-        await self.connection_pool.close()
+        await self.redis.close()
+        await self.redis.connection_pool.disconnect()
 
         self.status = "closed"
 
@@ -168,14 +169,14 @@ class Client:
         Client.log_debug("consumer %s ...", stream_name)
 
         try:
-            group_info = await self.connection_pool.xinfo_groups(stream_name)
+            group_info = await self.redis.xinfo_groups(stream_name)
             Client.log_debug("    - xinfo_groups: %r", group_info)
         except aioredis.RedisError as err:
             Client.log_debug("    - no existing group: %r", err)
             group_info = []
 
         if not any(e["name"] == group_name for e in group_info):
-            await self.connection_pool.xgroup_create(
+            await self.redis.xgroup_create(
                 stream_name, group_name, id="$", mkstream=True
             )
             Client.log_debug(
@@ -192,7 +193,7 @@ class Client:
         )
 
         try:
-            stream_info = await self.connection_pool.xinfo_stream(stream_name)
+            stream_info = await self.redis.xinfo_stream(stream_name)
             Client.log_debug("    - xinfo_stream: %r", stream_info)
 
             # set the consumer to read new messages that haven't
@@ -204,7 +205,7 @@ class Client:
             stream_info = []
 
         if scan_pending_on_start:
-            rslt = await self.connection_pool.xpending(stream_name, group_name)
+            rslt = await self.redis.xpending(stream_name, group_name)
             Client.log_debug(f"    - xpending: %r", rslt)
 
             pending_count = rslt["pending"]
@@ -224,7 +225,7 @@ class Client:
                 else:
                     Client.log_debug(f"    - pending messages for {pending_consumer!r}")
 
-                pending_messages = await self.connection_pool.xpending_range(
+                pending_messages = await self.redis.xpending_range(
                     stream_name,
                     group_name,
                     min=b"-",
@@ -248,7 +249,7 @@ class Client:
                         times_delivered,
                     )
                     if claim_stale_messages:
-                        retcode = await self.connection_pool.xclaim(
+                        retcode = await self.redis.xclaim(
                             stream_name,
                             group_name,
                             consumer_id,

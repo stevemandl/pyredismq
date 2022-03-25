@@ -64,7 +64,7 @@ class Subscriber:
         """
         Subscriber.log_debug("reader")
 
-        pubsub = self.client.connection_pool.pubsub()
+        pubsub = self.client.redis.pubsub()
         Subscriber.log_debug("    - pubsub: %r", pubsub)
 
         await pubsub.subscribe(*self.channels)

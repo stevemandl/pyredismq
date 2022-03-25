@@ -70,14 +70,14 @@ class Producer:
 
         # get a unique channel identifier if one hasn't been provided
         if response_channel_id is None:
-            uid = await self.client.connection_pool.incr(self.channel_key)
+            uid = await self.client.redis.incr(self.channel_key)
             response_channel_id = "%s:response.%d" % (self.client.namespace, uid)
         Producer.log_debug("    - response_channel_id: %r", response_channel_id)
 
         # pack it into the request payload
         payload["response_channel"] = response_channel_id
 
-        async with self.client.connection_pool.pubsub() as pubsub:
+        async with self.client.redis.pubsub() as pubsub:
             Producer.log_debug("    - pubsub: %r", pubsub)
 
             # start listening for a response
@@ -85,7 +85,7 @@ class Producer:
             Producer.log_debug("    - subscribed")
 
             # put the request into the stream
-            message_id: str = await self.client.connection_pool.xadd(
+            message_id: str = await self.client.redis.xadd(
                 self.stream_name, payload, maxlen=self.maxlen
             )
             Producer.log_debug("    - message_id: %r", message_id)
@@ -127,7 +127,7 @@ class Producer:
             payload["response_channel"] = response_channel_id
 
         # create a task to add it to the stream
-        future = self.client.connection_pool.xadd(
+        future = self.client.redis.xadd(
             self.stream_name, payload, maxlen=self.maxlen
         )
 
