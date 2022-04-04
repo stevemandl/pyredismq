@@ -4,6 +4,7 @@ Subscriber for RedisMQ
 from __future__ import annotations
 
 import sys
+import time
 import asyncio
 import json
 
@@ -110,39 +111,46 @@ class Subscriber:
         while True:
             Subscriber.log_debug("    - latest_ids: %r", self.latest_ids)
 
-            kwargs = {
-                "count": 1,
-                "block": self.xread_timeout,
-                "streams": self.latest_ids,
-            }
             try:
-                messages = await self.client.redis.xread(**kwargs)
+                pong = await self.client.redis.ping()
+                Subscriber.log_debug("    - pong: %r", pong)
+
+                set_result = await self.client.redis.set("x", time.time())
+                Subscriber.log_debug("    - set_result: %r", set_result)
+
+                # mock
+                # messages = ((self.channels[0], (("0-0", (("message", '"hi there"'),)),)),)
+                messages = await self.client.redis.xread(
+                    streams=self.latest_ids, count=1, block=self.xread_timeout
+                )
             except Exception as err:
                 Subscriber.log_debug("    - xread exception: %r", err)
-                raise
+                raise err
 
             if messages:
                 break
-            else:
-                Subscriber.log_debug("    - timeout")
+
+            Subscriber.log_debug("    - timeout")
 
         stream, element_list = messages[0]
         Subscriber.log_debug("    - stream, element_list: %r %r", stream, element_list)
 
         msg_id, payload = element_list[0]
         Subscriber.log_debug("    - msg_id, payload: %r %r", msg_id, payload)
+        sys.stderr.write(f"payload: {payload!r}\n")
 
         payload_dict = dict(payload)
         Subscriber.log_debug(
             "    - stream %s, id %s, payload_dict %s", stream, msg_id, payload_dict
         )
+        sys.stderr.write(f"payload_dict: {payload_dict!r}\n")
 
         # save the message ID so the next time this is entered it gets the
         # next message
         self.latest_ids[stream] = msg_id
 
         # build a Payload wrapper around the message
-        payload = Payload(self, stream, payload_dict["message"])
+        payload = Payload(self, stream, payload_dict)
         Subscriber.log_debug("    - payload: %r", payload)
 
         # return this payload back to the application
@@ -162,13 +170,15 @@ class Payload:
 
     log_debug: Callable[..., None]
 
-    def __init__(self, subscriber: Subscriber, channel: str, message: str) -> None:
-        Payload.log_debug("__init__ %r %r %r", subscriber, channel, message)
+    def __init__(
+        self, subscriber: Subscriber, channel: str, payload_dict: Dict[str, Any]
+    ) -> None:
+        Payload.log_debug("__init__ %r %r %r", subscriber, channel, payload_dict)
 
         self.subscriber = subscriber
         self.channel = channel
         try:
-            self.message = json.loads(message)
+            self.message = json.loads(payload_dict["message"])
         except json.decoder.JSONDecodeError:
             Payload.log_debug("    - unable to decode message, log this event")
             return
