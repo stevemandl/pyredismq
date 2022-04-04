@@ -209,8 +209,8 @@ class Client:
             Client.log_debug(f"    - xpending: %r", rslt)
 
             pending_count = rslt["pending"]
-            min_id = rslt["min"]
-            max_id = rslt["max"]
+            Client.log_debug("    - min, max id: %r, %r", rslt["min"], rslt["max"])
+
             pending_consumers = rslt["consumers"]
             if not pending_count:
                 Client.log_debug("    - no pending messages")
@@ -280,10 +280,6 @@ class Client:
 
         # build a subscriber
         subscriber = Subscriber(self, channels)
-
-        # wait until the reader() task is running and has completed the
-        # subscription request for its channels
-        await subscriber._reader_running.wait()
 
         # now we're good to go
         return subscriber

@@ -3,12 +3,12 @@ Subscriber for RedisMQ
 """
 from __future__ import annotations
 
+import sys
 import asyncio
 import json
-import time
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, List
 
 from .debugging import debugging
 
@@ -23,7 +23,7 @@ else:
 
 # settings
 MAXLEN = 100
-TIMEOUT = 10.0
+TIMEOUT = 10
 
 
 @debugging
@@ -34,7 +34,6 @@ class Subscriber:
 
     client: Client
     channels: List[str]
-    message_queue: asyncio.Queue
 
     log_debug: Callable[..., None]
 
@@ -50,125 +49,104 @@ class Subscriber:
 
         self.client = client
         self.channels = channels
-
-        self.pubsub = None
-        self.message_queue = asyncio.Queue()
-        self._reader_task = asyncio.create_task(self.reader())
-        self._reader_running = asyncio.Event()
-
-    async def reader(self):
-        """
-        This function runs as a continuous task, like a thread, that gets
-        messages from any of its subscribed channels and puts them in the
-        message_queue to be retrieved by the read() function.
-        """
-        Subscriber.log_debug("reader")
-
-        pubsub = self.client.redis.pubsub()
-        Subscriber.log_debug("    - pubsub: %r", pubsub)
-
-        await pubsub.subscribe(*self.channels)
-        Subscriber.log_debug("    - subscribed")
-
-        # let the client know its running
-        self._reader_running.set()
-
-        while True:
-            self._get_message = pubsub.get_message(
-                ignore_subscribe_messages=True, timeout=10.0
-            )
-            Subscriber.log_debug("    - _get_message: %r", self._get_message)
-
-            message = await self._get_message
-            Subscriber.log_debug("    - message: %r", message)
-            if message is not None:
-                await self.message_queue.put(message)
-                Subscriber.log_debug("    - put in the queue")
-
-        Subscriber.log_debug("    - reader exit")
+        self.latest_ids = {channel: "$" for channel in channels}
+        self.xread_timeout = TIMEOUT * 1000  # milliseconds
 
     def read(self) -> PayloadFuture:
         """
-        Read a message from any of the channels.
+        Read a message from the stream.
         """
         Subscriber.log_debug("read")
+        sys.stderr.write(
+            f"Subscriber.read running loop: {asyncio.get_running_loop()}\n"
+        )
 
         # create a future to hold the result
         read_result: PayloadFuture = asyncio.Future()
 
-        # if the queue has something in it, get it
-        if not self.message_queue.empty():
-            message = self.message_queue.get_nowait()
-            Subscriber.log_debug("    - message: %r", message)
+        # create a task to read the next message
+        get_message_task = asyncio.create_task(self.get_message(read_result))
+        Subscriber.log_debug("    - get_message_task: %r", get_message_task)
 
-            payload = Payload(self, message["channel"], message["data"])
-            Subscriber.log_debug("    - payload: %r", payload)
+        get_message_task.add_done_callback(self._get_message_task_callback)
 
-            read_result.set_result(payload)
+        # add a callback to the read_result which will be called when the task
+        # has received a message and wrapped it in a Payload, or if the
+        # read_result gets canceled
+        read_result.add_done_callback(partial(self._read_done, get_message_task))
 
-        else:
-            # create a task to get the next message in the queue
-            get_message_queue = asyncio.create_task(self.message_queue.get())
-            Subscriber.log_debug("    - get_message_queue: %r", get_message_queue)
-
-            get_message_queue.add_done_callback(
-                partial(self._get_message_queue_callback, read_result)
-            )
-
-            # add a callback to the read_result which will be called when the task
-            # has received a message and wrapped it in a Payload, or if the
-            # read_result gets canceled
-            read_result.add_done_callback(
-                partial(self._read_result_callback, get_message_queue)
-            )
-
-        Subscriber.log_debug("    - read_result: %r", read_result)
         return read_result
 
-    def _get_message_queue_callback(self, read_result, get_message_queue) -> None:
+    def _get_message_task_callback(self, *args):
         """
-        This callback function is called when a message has been retrieved by
-        the read() function or the get_message_queue task has been canceled.
-        Rather than simply copying the content from the queue to the
-        read_result future, this wraps the content in a Payload.
+        Callback function for getting a message from the stream, used for
+        debugging.
         """
-        Subscriber.log_debug(
-            "_get_message_queue_callback %r %r", read_result, get_message_queue
-        )
+        Subscriber.log_debug("_get_message_task_callback %r", args)
 
-        # if the task for getting the message from the queue is cancelled don't
-        # attempt to get the result
-        if get_message_queue.cancelled():
-            Subscriber.log_debug("    - cancelled")
-            return
-
-        message = get_message_queue.result()
-        Subscriber.log_debug("    - message: %r", message)
-
-        payload = Payload(self, message["channel"], message["data"])
-        Subscriber.log_debug("    - payload: %r", payload)
-
-        read_result.set_result(payload)
-
-    def _read_result_callback(
-        self, get_message_queue, read_result: PayloadFuture
+    def _read_done(
+        self, get_message_task: asyncio.Task, read_result: PayloadFuture
     ) -> None:
         """
-        This callback function is called when the read_result future has
-        been completed or when that future has been cancelled.  If it is
-        canceled, the get_message_queue task also needs to be cancelled.
+        Callback for read()
         """
-        Subscriber.log_debug(
-            "_read_result_callback %r %r", get_message_queue, read_result
-        )
+        Subscriber.log_debug("_read_done %r %r", get_message_task, read_result)
 
         # if the read_result has been canceled, cancel the task for getting
         # the next message
         if read_result.cancelled():
-            Subscriber.log_debug(f"   - read is canceled")
-            if not get_message_queue.cancelled():
-                Subscriber.log_debug(f"   - cancelling get_message_queue")
-                get_message_queue.cancel()
+            Subscriber.log_debug(f"   - read(%s) is canceled", self.consumer_name)
+            get_message_task.cancel()
+            Subscriber.log_debug(f"   - %r is canceled", get_message_task)
+
+    async def get_message(self, read_result: PayloadFuture) -> None:
+        """
+        Get the next message in the stream, checking the backlog first to see
+        if there are any previously delivered messages that haven't been acked
+        (like the consumer crashed processing the message).
+        """
+        Subscriber.log_debug("get_message %r", read_result)
+
+        while True:
+            Subscriber.log_debug("    - latest_ids: %r", self.latest_ids)
+
+            kwargs = {
+                "count": 1,
+                "block": self.xread_timeout,
+                "streams": self.latest_ids,
+            }
+            try:
+                messages = await self.client.redis.xread(**kwargs)
+            except Exception as err:
+                Subscriber.log_debug("    - xread exception: %r", err)
+                raise
+
+            if messages:
+                break
+            else:
+                Subscriber.log_debug("    - timeout")
+
+        stream, element_list = messages[0]
+        Subscriber.log_debug("    - stream, element_list: %r %r", stream, element_list)
+
+        msg_id, payload = element_list[0]
+        Subscriber.log_debug("    - msg_id, payload: %r %r", msg_id, payload)
+
+        payload_dict = dict(payload)
+        Subscriber.log_debug(
+            "    - stream %s, id %s, payload_dict %s", stream, msg_id, payload_dict
+        )
+
+        # save the message ID so the next time this is entered it gets the
+        # next message
+        self.latest_ids[stream] = msg_id
+
+        # build a Payload wrapper around the message
+        payload = Payload(self, stream, payload_dict["message"])
+        Subscriber.log_debug("    - payload: %r", payload)
+
+        # return this payload back to the application
+        read_result.set_result(payload)
 
 
 @debugging

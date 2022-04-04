@@ -5,15 +5,17 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, List
 
 from .debugging import debugging
 
 if TYPE_CHECKING:
     # circular reference
     from .client import Client
+
+# settings
+MAXLEN = 100
 
 
 @debugging
@@ -31,6 +33,7 @@ class Publisher:
         self,
         client: Client,
         channels: List[str] = [],
+        maxlen: int = MAXLEN,
     ) -> None:
         """
         default constructor
@@ -39,6 +42,7 @@ class Publisher:
 
         self.client = client
         self.channels = channels
+        self.maxlen = maxlen
 
     # pylint: disable=invalid-name
     async def publish(self, message: Any, channels: List[str] = []) -> None:
@@ -48,16 +52,20 @@ class Publisher:
         Publisher.log_debug("publish %r", message)
 
         # JSON encode the message
-        payload = json.dumps(message)
+        payload = {"message": json.dumps(message)}
 
-        # publish on the ctor channels plus any extras
-        pub_channels = self.channels + channels
+        # publish to the ctor channels plus any extras
+        pub_channels = set(self.channels).union(channels)
 
-        numsub = await self.client.redis.pubsub_numsub(*pub_channels)
-        Publisher.log_debug("    - numsub: %r", numsub)
+        # batch these up in a pipline
+        pipe = self.client.redis.pipeline()
+        futures = []
+        for channel in pub_channels:
+            futures.append(pipe.xadd(channel, payload, maxlen=self.maxlen))
 
-        # send a copy to each stream
-        for channel, subscriber_count in numsub:
-            if subscriber_count:
-                await self.client.redis.publish(channel, payload)
-                Publisher.log_debug("    - published: %r", channel)
+        # not sure why these are in this order
+        result = await pipe.execute()
+        await asyncio.gather(*futures)
+        Publisher.log_debug("    - result: %r", result)
+
+        return result

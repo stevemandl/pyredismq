@@ -25,7 +25,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/stevemandl/pyredismq",
     packages=setuptools.find_packages(exclude=("tests",)),
-    install_requires=["aioredis"],
+    install_requires=["redis"],
     extras_require={
         "dev": ["pytest", "pytest-asyncio", "pytest-cov", "pytest-timeout", "pylint"]
     },
