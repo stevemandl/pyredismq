@@ -281,5 +281,16 @@ class Client:
         # build a subscriber
         subscriber = Subscriber(self, channels)
 
+        latest_ids = {}
+        for channel in channels:
+            try:
+                stream_info = await self.redis.xinfo_stream(channel)
+                Subscriber.log_debug("    - stream info: %s, %r", channel, stream_info)
+                latest_ids[channel] = stream_info["last-entry"][0]
+            except aioredis.RedisError:
+                Subscriber.log_debug("    - no info: %s", channel)
+                latest_ids[channel] = "0-0"
+        subscriber.latest_ids = latest_ids
+
         # now we're good to go
         return subscriber

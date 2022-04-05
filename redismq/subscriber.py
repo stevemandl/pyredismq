@@ -50,7 +50,7 @@ class Subscriber:
 
         self.client = client
         self.channels = channels
-        self.latest_ids = {channel: "$" for channel in channels}
+        self.latest_ids = {}
         self.xread_timeout = TIMEOUT * 1000  # milliseconds
 
     def read(self) -> PayloadFuture:
@@ -58,9 +58,6 @@ class Subscriber:
         Read a message from the stream.
         """
         Subscriber.log_debug("read")
-        sys.stderr.write(
-            f"Subscriber.read running loop: {asyncio.get_running_loop()}\n"
-        )
 
         # create a future to hold the result
         read_result: PayloadFuture = asyncio.Future()
@@ -102,9 +99,7 @@ class Subscriber:
 
     async def get_message(self, read_result: PayloadFuture) -> None:
         """
-        Get the next message in the stream, checking the backlog first to see
-        if there are any previously delivered messages that haven't been acked
-        (like the consumer crashed processing the message).
+        Get the next message in the stream.
         """
         Subscriber.log_debug("get_message %r", read_result)
 
