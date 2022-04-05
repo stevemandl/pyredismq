@@ -20,7 +20,7 @@ async def test_client_connect() -> None:
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_client_barf() -> None:
     "test client with invalid URL should throw"
-    with pytest.raises(redis.exceptions.ConnectionError):
+    with pytest.raises(aioredis.ConnectionError):
         await Client.connect("redis://bogus")
 
 
