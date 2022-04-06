@@ -3,8 +3,7 @@ Test Client
 """
 
 import pytest  # type: ignore
-import redis
-from redis import asyncio as aioredis  # type: ignore[attr-defined]
+from redis import exceptions # type: ignore[attr-defined]
 
 from tests.utils import TEST_URL  # type: ignore
 from redismq import Client
@@ -13,14 +12,14 @@ from redismq import Client
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_client_connect() -> None:
     "test client with valid options"
-    p_connection = await Client.connect(TEST_URL)
+    p_connection = await Client.connect(TEST_URL, namespace='foo')
     await p_connection.close()
 
 
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_client_barf() -> None:
     "test client with invalid URL should throw"
-    with pytest.raises(redis.exceptions.ConnectionError):
+    with pytest.raises(exceptions.ConnectionError):
         await Client.connect("redis://bogus")
 
 

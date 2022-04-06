@@ -7,18 +7,11 @@ import asyncio
 import json
 from functools import partial
 
-from typing import TYPE_CHECKING, Any, Dict, Callable, Optional
+from typing import TYPE_CHECKING, Any, Dict, TypedDict, Callable, Optional
+from redis import Connection # type: ignore[attr-defined]
 
 from .debugging import debugging
-
-if TYPE_CHECKING:
-    from .client import Client
-
-    # class is declared as generic in stubs but not at runtime
-    PayloadFuture = asyncio.Future[Any]
-else:
-    PayloadFuture = asyncio.Future
-
+Client = TypedDict('Client', redis=Connection)
 
 @debugging
 class Consumer:  # pylint: disable=too-few-public-methods
@@ -204,10 +197,6 @@ class Payload:
             )
             return
 
-        # this payload is now considered 'active', something is going to work
-        # on it until it is acknowledged
-        self.consumer.client.active(self)
-
     async def ack(self, response: Any = None, error: Any = None) -> None:
         """
         Acks the message on the stream and publishes the response on the
@@ -229,5 +218,8 @@ class Payload:
             )
             Payload.log_debug("    - published json")
 
-        # this payload is now considered 'inactive'
-        self.consumer.client.inactive(self)
+if TYPE_CHECKING:
+    # class is declared as generic in stubs but not at runtime
+    PayloadFuture = asyncio.Future[Payload] # type: ignore
+else:
+    PayloadFuture = asyncio.Future

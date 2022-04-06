@@ -7,18 +7,14 @@ import asyncio
 import json
 import time
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, cast
-
+from typing import TYPE_CHECKING, Any, Callable, Dict, TypedDict, Optional, cast
+from redis import Connection # type: ignore[attr-defined]
 from .debugging import debugging
 
-if TYPE_CHECKING:
-    # circular reference
-    from .client import Client
+Client = TypedDict('Client', redis=Connection)
 
-    # class is declared as generic in stubs but not at runtime
-    AnyFuture = asyncio.Future[Any]
-else:
-    AnyFuture = asyncio.Future
+# class is declared as generic in stubs but not at runtime
+AnyFuture = asyncio.Future
 
 # settings
 MAXLEN = 100

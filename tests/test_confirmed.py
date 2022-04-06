@@ -57,6 +57,8 @@ async def test_send_and_read() -> None:
     p_connection = await Client.connect(TEST_URL)
     await p_connection.redis.delete("mystream")
     my_producer = await p_connection.producer("mystream")
+    # add a message so pending messages will get processed
+    await my_producer.addUnconfirmedMessage("Hello there!")
     q_connection = await Client.connect(TEST_URL)
     my_consumer = await q_connection.consumer("mystream", "mygroup", "consumer1")
 
@@ -64,6 +66,25 @@ async def test_send_and_read() -> None:
     recv_task = asyncio.create_task(read_a_confirmed_message(my_consumer))
     await asyncio.gather(send_task, recv_task)
     recv_task.cancel()
+    await p_connection.dispose_producer(my_producer)
+
+    await p_connection.close()
+    await q_connection.close()
+
+@pytest.mark.asyncio  # type: ignore[misc]
+async def test_pending() -> None:
+    "test processing pending messages"
+    p_connection = await Client.connect(TEST_URL)
+    q_connection = await Client.connect(TEST_URL)
+    await p_connection.redis.delete("mystream")
+    my_producer = await p_connection.producer("mystream")
+    await q_connection.consumer("mystream", "mygroup", "consumer0")
+    # add a message 
+    await my_producer.addUnconfirmedMessage("Hello there!")
+    # xread the message so it looks like it was read by consumer1 but never processed
+    await p_connection.redis.xreadgroup(groupname='mygroup', consumername='consumer1',count=1, block=500,streams={'mystream': b">"})
+    await q_connection.consumer("mystream", "mygroup", "consumer1")
+    await p_connection.dispose_producer(my_producer)
 
     await p_connection.close()
     await q_connection.close()

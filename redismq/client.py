@@ -7,13 +7,11 @@ from __future__ import annotations
 import asyncio
 from redis import asyncio as aioredis  # type: ignore[attr-defined]
 
-from typing import Any, Callable, Dict, Set, List, Optional
+from typing import Any, Callable, Dict, Set, Optional
 
 from .debugging import debugging
 from .producer import Producer
 from .consumer import Consumer
-from .publisher import Publisher
-from .subscriber import Subscriber
 
 __all__ = ["Client"]
 
@@ -85,26 +83,6 @@ class Client:
         client.status = "ready"
 
         return client
-
-    def active(self, payload) -> None:
-        Client.log_debug("active %r", payload)
-
-        # add this to the active payloads
-        self.payloads.add(payload)
-        self.payloads_event.clear()
-
-    def inactive(self, payload) -> None:
-        Client.log_debug("inactive %r", payload)
-
-        # remove this from the active payloads and let everyone know
-        try:
-            self.payloads.remove(payload)
-        except KeyError:
-            Client.log_debug("    - payload not active?")
-            pass
-        if not self.payloads:
-            Client.log_debug("    - no active payloads")
-            self.payloads_event.set()
 
     async def close(self) -> None:
         """
@@ -263,27 +241,3 @@ class Client:
                         consumer.check_backlog = True
 
         return consumer
-
-    async def publisher(self, channels: List[str] = []) -> Publisher:
-        """
-        Use this to get a Publisher
-        """
-        Client.log_debug("publisher %s", channels)
-
-        return Publisher(self, channels)
-
-    async def subscriber(self, channels: List[str]) -> Subscriber:
-        """
-        Use this to get a Subscriber
-        """
-        Client.log_debug("subscriber %s", channels)
-
-        # build a subscriber
-        subscriber = Subscriber(self, channels)
-
-        # wait until the reader() task is running and has completed the
-        # subscription request for its channels
-        await subscriber._reader_running.wait()
-
-        # now we're good to go
-        return subscriber
