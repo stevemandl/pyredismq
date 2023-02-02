@@ -8,10 +8,10 @@ import json
 import time
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, TypedDict, Optional, cast
-from redis import Connection # type: ignore[attr-defined]
+from redis import Connection  # type: ignore[attr-defined]
 from .debugging import debugging
 
-Client = TypedDict('Client', redis=Connection)
+Client = TypedDict("Client", redis=Connection)
 
 # class is declared as generic in stubs but not at runtime
 AnyFuture = asyncio.Future
@@ -126,9 +126,7 @@ class Producer:
             payload["response_channel"] = response_channel_id
 
         # create a task to add it to the stream
-        future = self.client.redis.xadd(
-            self.stream_name, payload, maxlen=self.maxlen
-        )
+        future = self.client.redis.xadd(self.stream_name, payload, maxlen=self.maxlen)
 
         return cast(AnyFuture, future)
 
