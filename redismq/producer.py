@@ -73,38 +73,41 @@ class Producer:
         # pack it into the request payload
         payload["response_channel"] = response_channel_id
 
-        async with self.client.redis.pubsub() as pubsub:
-            Producer.log_debug("    - pubsub: %r", pubsub)
+        pubsub = self.client.pubsub
+        Producer.log_debug("    - pubsub: %r", pubsub)
 
-            # start listening for a response
-            await pubsub.subscribe(response_channel_id)
-            Producer.log_debug("    - subscribed")
+        # start listening for a response
+        await pubsub.subscribe(response_channel_id)
+        Producer.log_debug("    - subscribed")
 
-            # put the request into the stream
-            message_id: str = await self.client.redis.xadd(
-                self.stream_name, payload, maxlen=self.maxlen
-            )
-            Producer.log_debug("    - message_id: %r", message_id)
+        # put the request into the stream
+        message_id: str = await self.client.redis.xadd(
+            self.stream_name, payload, maxlen=self.maxlen
+        )
+        Producer.log_debug("    - message_id: %r", message_id)
 
-            try:
-                # wait for the response to come back encoded as JSON
-                while True:
-                    json_message = await pubsub.get_message(
-                        ignore_subscribe_messages=True, timeout=self.timeout
-                    )
-                    Producer.log_debug("    - json_message: %r", json_message)
-                    if json_message:
-                        response = json.loads(json_message["data"])
-                        break
-            except ValueError as err:
-                Producer.log_debug("    - value/decoding error %s", response_channel_id)
-                response = {"message": "JSON Decoding Error", "err": err}
-            except asyncio.CancelledError as err:
-                Producer.log_debug("    - canceled %s", response_channel_id)
-                response = {"message": "Cancelled Error", "err": err}
-            finally:
-                Producer.log_debug("    - finally %s", response_channel_id)
-                await pubsub.unsubscribe(response_channel_id)
+        try:
+            # wait for the response to come back encoded as JSON
+            while True:
+                json_message = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=self.timeout
+                )
+                Producer.log_debug("    - json_message: %r", json_message)
+                if json_message:
+                    if json_message["channel"] != response_channel_id:
+                        continue
+                    response = json.loads(json_message["data"])
+                    await pubsub.unsubscribe(response_channel_id)
+                    break
+        except ValueError as err:
+            Producer.log_debug("    - value/decoding error %s", response_channel_id)
+            response = {"message": "JSON Decoding Error", "err": err}
+        except asyncio.CancelledError as err:
+            Producer.log_debug("    - canceled %s", response_channel_id)
+            response = {"message": "Cancelled Error", "err": err}
+        finally:
+            Producer.log_debug("    - finally %s", response_channel_id)
+            await pubsub.unsubscribe(response_channel_id)
 
         return response
 

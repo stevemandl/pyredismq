@@ -32,6 +32,7 @@ class Client:
     status: str
     namespace: str
     redis: Any
+    pubsub: Any
 
     payloads: Set[Any]
     payloads_updated: asyncio.Condition
@@ -80,6 +81,8 @@ class Client:
         rslt = await client.redis.ping()
         Client.log_debug("    - ping: %r", rslt)
 
+        client.pubsub = client.redis.pubsub()
+
         client.status = "ready"
 
         return client
@@ -99,6 +102,7 @@ class Client:
         # wait for the event that says no more pending
         Client.log_debug(f"    - payloads: {self.payloads}")
         await self.payloads_event.wait()
+        await self.pubsub.close()
         await self.redis.close()
         await self.redis.connection_pool.disconnect()
 
