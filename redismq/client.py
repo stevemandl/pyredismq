@@ -33,6 +33,7 @@ class Client:
     namespace: str
     redis: Any
     pubsub: Any
+    sub_task: Any
 
     payloads: Set[Any]
     payloads_updated: asyncio.Condition
@@ -72,17 +73,16 @@ class Client:
         client.status = "connecting"
 
         # create a connection pool
-        client.redis = aioredis.from_url(
-            address, max_connections=10, decode_responses=True
-        )
+        pool = aioredis.BlockingConnectionPool.from_url(address, max_connections=10, decode_responses=True)
+        client.redis = aioredis.Redis(connection_pool = pool)
         Client.log_debug("    - redis: %s", client.redis)
 
         # try to ping it
         rslt = await client.redis.ping()
         Client.log_debug("    - ping: %r", rslt)
 
-        client.pubsub = client.redis.pubsub()
-
+        client.pubsub = client.redis.pubsub(ignore_subscribe_messages=True)
+        client.sub_task = asyncio.get_running_loop().create_task(client.pubsub.run())
         client.status = "ready"
 
         return client
@@ -102,6 +102,11 @@ class Client:
         # wait for the event that says no more pending
         Client.log_debug(f"    - payloads: {self.payloads}")
         await self.payloads_event.wait()
+        self.sub_task.cancel()
+        try:
+            await self.sub_task
+        except asyncio.CancelledError:
+            pass
         await self.pubsub.close()
         await self.redis.close()
         await self.redis.connection_pool.disconnect()
