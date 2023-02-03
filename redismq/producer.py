@@ -56,60 +56,26 @@ class Producer:
 
         self.id = time.time_ns()
 
-    async def _resp_task(
-        self, payload: Dict[str, Any], response_channel_id: Optional[str]
-    ) -> Any:
-        """
-        utility method for a confirmed request
-        """
-        Producer.log_debug("_resp_task: %r %r", payload, response_channel_id)
+    # make the handler for the channel
+    def get_handler(self, channel_id, fut: AnyFuture):
+        Producer.log_debug("get_handler channel_id %r fut %r" % (channel_id, fut))
 
-        # get a unique channel identifier if one hasn't been provided
-        if response_channel_id is None:
-            uid = await self.client.redis.incr(self.channel_key)
-            response_channel_id = "%s:response.%d" % (self.client.namespace, uid)
-        Producer.log_debug("    - response_channel_id: %r", response_channel_id)
+        async def _handler(json_message=None):
+            Producer.log_debug("_handler json_message: %r", json_message)
+            try:
+                response = json.loads(json_message["data"])
+            except ValueError as err:
+                Producer.log_debug("    - value/decoding error %s", channel_id)
+                response = {"message": "JSON Decoding Error", "err": err}
+            except asyncio.CancelledError as err:
+                Producer.log_debug("    - cancelled %s", channel_id)
+                response = {"message": "Cancelled Error", "err": err}
+            finally:
+                Producer.log_debug("    - finally %s", channel_id)
+                await self.client.pubsub.unsubscribe(channel_id)
+                fut.set_result(response)
 
-        # pack it into the request payload
-        payload["response_channel"] = response_channel_id
-
-        pubsub = self.client.pubsub
-        Producer.log_debug("    - pubsub: %r", pubsub)
-
-        # start listening for a response
-        await pubsub.subscribe(response_channel_id)
-        Producer.log_debug("    - subscribed")
-
-        # put the request into the stream
-        message_id: str = await self.client.redis.xadd(
-            self.stream_name, payload, maxlen=self.maxlen
-        )
-        Producer.log_debug("    - message_id: %r", message_id)
-
-        try:
-            # wait for the response to come back encoded as JSON
-            while True:
-                json_message = await pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=self.timeout
-                )
-                Producer.log_debug("    - json_message: %r", json_message)
-                if json_message:
-                    if json_message["channel"] != response_channel_id:
-                        continue
-                    response = json.loads(json_message["data"])
-                    await pubsub.unsubscribe(response_channel_id)
-                    break
-        except ValueError as err:
-            Producer.log_debug("    - value/decoding error %s", response_channel_id)
-            response = {"message": "JSON Decoding Error", "err": err}
-        except asyncio.CancelledError as err:
-            Producer.log_debug("    - canceled %s", response_channel_id)
-            response = {"message": "Cancelled Error", "err": err}
-        finally:
-            Producer.log_debug("    - finally %s", response_channel_id)
-            await pubsub.unsubscribe(response_channel_id)
-
-        return response
+        return _handler
 
     # pylint: disable=invalid-name
     def addUnconfirmedMessage(
@@ -131,22 +97,38 @@ class Producer:
         return cast(AnyFuture, future)
 
     # pylint: disable=invalid-name
-    def addConfirmedMessage(
-        self, message: Any, response_channel_id: Optional[str] = None
-    ) -> AnyFuture:
+    async def addConfirmedMessage(self, message: Any):
         """
-        Return a task that adds a confirmed message to the message queue and
-        waits for the response.
+        Adds a confirmed message to the message queue and
+        results in the confirmed response.
         """
         Producer.log_debug("addConfirmedMessage %r", message)
 
         # JSON encode the message
         payload = {"message": json.dumps(message)}
+        # create a future
+        future = asyncio.get_running_loop().create_future()
 
-        # create a task to add it to the stream
-        future = self._resp_task(payload, response_channel_id)
+        # get a unique channel identifier
+        uid = await self.client.redis.incr(self.channel_key)
+        response_channel_id = "%s:response.%d" % (self.client.namespace, uid)
+        Producer.log_debug("    - response_channel_id: %r", response_channel_id)
 
-        return cast(AnyFuture, future)
+        # pack it into the request payload
+        payload["response_channel"] = response_channel_id
+
+        # start listening for a response
+        kwargs = {response_channel_id: self.get_handler(response_channel_id, future)}
+        await self.client.pubsub.subscribe(**kwargs)
+        Producer.log_debug("    - subscribed")
+
+        # put the request into the stream
+        message_id: str = await self.client.redis.xadd(
+            self.stream_name, payload, maxlen=self.maxlen
+        )
+        Producer.log_debug("    - message_id: %r", message_id)
+        # future will get the result set by the handler when the response is published
+        return await future
 
     # pylint: disable=invalid-name
     def destroy(self) -> None:

@@ -45,7 +45,7 @@ async def ack_confirmed_messages(my_consumer: Consumer) -> None:
     while True:
         try:
             payload = await my_consumer.read()
-            await payload.ack("Acknowledged")
+            await payload.ack(f"Acknowledged {payload.message}")
         except Exception as err:
             print(f"ack_confirmed_messages exception: {err}")
             raise
@@ -122,8 +122,31 @@ async def test_multiple_confirmed() -> None:
 
     ack_task = asyncio.create_task(ack_confirmed_messages(my_consumer))
     for i in range(10):
-        response = await my_producer.addConfirmedMessage(f"message {i}")
-        assert response["message"] == "Acknowledged"
+        payload = f"message {i}"
+        response = await my_producer.addConfirmedMessage(payload)
+        assert response["message"] == f"Acknowledged {payload}"
+    ack_task.cancel()
+
+    await p_connection.close()
+    await q_connection.close()
+
+@pytest.mark.execution_timeout(20)
+@pytest.mark.asyncio  # type: ignore[misc]
+async def test_concurrent_confirmed() -> None:
+    "test many concurrent confirmed messages"
+    p_connection = await Client.connect(TEST_URL)
+    await p_connection.redis.delete("mystream")
+    my_producer = await p_connection.producer("mystream")
+
+    q_connection = await Client.connect(TEST_URL)
+    my_consumer = await q_connection.consumer("mystream", "mygroup", "consumer1")
+    confirmed_coros = []
+    for i in range(20):
+        # response = await my_producer.addConfirmedMessage(f"message {i}")
+        confirmed_coros.append( my_producer.addConfirmedMessage(f"message {i}"))
+    ack_task = asyncio.create_task(ack_confirmed_messages(my_consumer))
+    responses = await asyncio.gather(*confirmed_coros)
+    assert all([responses[i]["message"] == f"Acknowledged message {i}" for i in range(20)])
     ack_task.cancel()
 
     await p_connection.close()
