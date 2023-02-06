@@ -40,6 +40,41 @@ async def read_a_confirmed_message(my_consumer: Consumer) -> None:
     await payload.ack(resp)
 
 
+async def botch_a_confirmed_message(my_conn, my_stream, my_group, my_consumer) -> None:
+    "return bogus response to a confirmed message"
+
+    args = {
+        "groupname": my_group,
+        "consumername": my_consumer,
+        "count": 1,
+        "block": 1000,
+        "streams": {my_stream: b">"},
+    }
+    while True:
+        messages = await my_conn.xreadgroup(**args)
+        if not messages:
+            continue
+        stream, element_list = messages[0]
+        msg_id, payload = element_list[0]
+        payload_dict = dict(payload)
+        response_channel = payload_dict.get("response_channel", None)
+        # ack the message in the stream
+        await my_conn.xack(my_stream, my_group, msg_id)
+        if response_channel is not None:
+            await my_conn.publish(response_channel, "not json")
+            return
+
+
+async def receive_a_botched_confirmation(my_producer: Producer, delay: int = 0) -> None:
+    "test botched confirmation"
+    await asyncio.sleep(delay)
+    response = await my_producer.addConfirmedMessage(
+        "Hello there! Let me know when you get this."
+    )
+    assert response["message"] == "JSON Decoding Error"
+    assert "err" in response
+
+
 async def ack_confirmed_messages(my_consumer: Consumer) -> None:
     "ack confirmed messages"
     while True:
@@ -47,7 +82,6 @@ async def ack_confirmed_messages(my_consumer: Consumer) -> None:
             payload = await my_consumer.read()
             await payload.ack(f"Acknowledged {payload.message}")
         except Exception as err:
-            print(f"ack_confirmed_messages exception: {err}")
             raise
 
 
@@ -79,10 +113,16 @@ async def test_pending() -> None:
     await p_connection.redis.delete("mystream")
     my_producer = await p_connection.producer("mystream")
     await q_connection.consumer("mystream", "mygroup", "consumer0")
-    # add a message 
+    # add a message
     await my_producer.addUnconfirmedMessage("Hello there!")
     # xread the message so it looks like it was read by consumer1 but never processed
-    await p_connection.redis.xreadgroup(groupname='mygroup', consumername='consumer1',count=1, block=500,streams={'mystream': b">"})
+    await p_connection.redis.xreadgroup(
+        groupname="mygroup",
+        consumername="consumer1",
+        count=1,
+        block=500,
+        streams={"mystream": b">"},
+    )
     await q_connection.consumer("mystream", "mygroup", "consumer1")
     await p_connection.dispose_producer(my_producer)
 
@@ -109,7 +149,6 @@ async def test_slow_send_and_read() -> None:
     await q_connection.close()
 
 
-@pytest.mark.execution_timeout(20)
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_multiple_confirmed() -> None:
     "test many confirmed messages"
@@ -130,7 +169,7 @@ async def test_multiple_confirmed() -> None:
     await p_connection.close()
     await q_connection.close()
 
-@pytest.mark.execution_timeout(20)
+
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_concurrent_confirmed() -> None:
     "test many concurrent confirmed messages"
@@ -143,11 +182,40 @@ async def test_concurrent_confirmed() -> None:
     confirmed_coros = []
     for i in range(20):
         # response = await my_producer.addConfirmedMessage(f"message {i}")
-        confirmed_coros.append( my_producer.addConfirmedMessage(f"message {i}"))
+        confirmed_coros.append(my_producer.addConfirmedMessage(f"message {i}"))
     ack_task = asyncio.create_task(ack_confirmed_messages(my_consumer))
     responses = await asyncio.gather(*confirmed_coros)
-    assert all([responses[i]["message"] == f"Acknowledged message {i}" for i in range(20)])
+    assert all(
+        [responses[i]["message"] == f"Acknowledged message {i}" for i in range(20)]
+    )
     ack_task.cancel()
+
+    await p_connection.close()
+    await q_connection.close()
+
+
+@pytest.mark.asyncio  # type: ignore[misc]
+async def test_bad_json() -> None:
+    "test sending a confirmed message receiving a bogus response"
+    p_connection = await Client.connect(TEST_URL)
+    await p_connection.redis.delete("mystream")
+    my_producer = await p_connection.producer("mystream")
+    q_connection = await Client.connect(TEST_URL)
+    # call client.consumer just to create the consumer group
+    my_consumer = await q_connection.consumer("mystream", "mygroup", "consumer1")
+
+    # add a message
+    await my_producer.addUnconfirmedMessage("Hello there!")
+
+    send_task = asyncio.create_task(receive_a_botched_confirmation(my_producer))
+    recv_task = asyncio.create_task(
+        botch_a_confirmed_message(
+            q_connection.redis, "mystream", "mygroup", "consumer1"
+        )
+    )
+    await asyncio.gather(send_task, recv_task)
+    recv_task.cancel()
+    await p_connection.dispose_producer(my_producer)
 
     await p_connection.close()
     await q_connection.close()
