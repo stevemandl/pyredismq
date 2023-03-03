@@ -73,8 +73,10 @@ class Client:
         client.status = "connecting"
 
         # create a connection pool
-        pool = aioredis.BlockingConnectionPool.from_url(address, max_connections=10, decode_responses=True)
-        client.redis = aioredis.Redis(connection_pool = pool)
+        pool = aioredis.BlockingConnectionPool.from_url(
+            address, max_connections=10, decode_responses=True
+        )
+        client.redis = aioredis.Redis(connection_pool=pool)
         Client.log_debug("    - redis: %s", client.redis)
 
         # try to ping it
