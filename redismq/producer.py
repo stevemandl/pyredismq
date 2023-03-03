@@ -62,18 +62,23 @@ class Producer:
 
         async def _handler(json_message=None):
             Producer.log_debug("_handler json_message: %r", json_message)
+            response = None
             try:
                 response = json.loads(json_message["data"])
             except ValueError as err:
                 Producer.log_debug("    - value/decoding error %s", channel_id)
                 response = {"message": "JSON Decoding Error", "err": err}
+            except TypeError as err:
+                Producer.log_debug("    - type error %s", channel_id)
+                response = {"message": "Type Error", "err": err}
             except asyncio.CancelledError as err:
                 Producer.log_debug("    - cancelled %s", channel_id)
                 response = {"message": "Cancelled Error", "err": err}
             finally:
                 Producer.log_debug("    - finally %s", channel_id)
                 await self.client.pubsub.unsubscribe(channel_id)
-                fut.set_result(response)
+                if not fut.cancelled():
+                    fut.set_result(response)
 
         return _handler
 
@@ -118,7 +123,8 @@ class Producer:
         payload["response_channel"] = response_channel_id
 
         # start listening for a response
-        kwargs = {response_channel_id: self.get_handler(response_channel_id, future)}
+        _handler = self.get_handler(response_channel_id, future)
+        kwargs = {response_channel_id: _handler}
         await self.client.pubsub.subscribe(**kwargs)
         Producer.log_debug("    - subscribed")
 
@@ -128,7 +134,17 @@ class Producer:
         )
         Producer.log_debug("    - message_id: %r", message_id)
         # future will get the result set by the handler when the response is published
-        return await future
+        try:
+            resp = await asyncio.wait_for(future, self.timeout)
+        except asyncio.TimeoutError as err:
+            Producer.log_debug("    - timeout waiting for future: %r", err)
+            await _handler()
+            resp = {"message": "Timeout Error", "err": err}
+        except asyncio.CancelledError as err:
+            Producer.log_debug("    - cancelled while waiting for future %r", err)
+            await _handler()
+            resp = {"message": "Cancelled Error", "err": err}
+        return resp
 
     # pylint: disable=invalid-name
     def destroy(self) -> None:

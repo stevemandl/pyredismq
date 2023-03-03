@@ -105,6 +105,7 @@ async def test_send_and_read() -> None:
     await p_connection.close()
     await q_connection.close()
 
+
 @pytest.mark.asyncio  # type: ignore[misc]
 async def test_pending() -> None:
     "test processing pending messages"
@@ -202,7 +203,7 @@ async def test_bad_json() -> None:
     my_producer = await p_connection.producer("mystream")
     q_connection = await Client.connect(TEST_URL)
     # call client.consumer just to create the consumer group
-    my_consumer = await q_connection.consumer("mystream", "mygroup", "consumer1")
+    await q_connection.consumer("mystream", "mygroup", "consumer1")
 
     # add a message
     await my_producer.addUnconfirmedMessage("Hello there!")
@@ -219,3 +220,34 @@ async def test_bad_json() -> None:
 
     await p_connection.close()
     await q_connection.close()
+
+
+@pytest.mark.asyncio  # type: ignore[misc]
+async def test_confirmed_timeout() -> None:
+    "test timeout confirmed message"
+    p_connection = await Client.connect(TEST_URL)
+    await p_connection.redis.delete("mystream")
+    my_producer = await p_connection.producer("mystream", timeout=0.1)
+    # no consumer
+    resp = await my_producer.addConfirmedMessage(f"message to nowhere")
+    assert resp["message"] == "Timeout Error"
+    assert "err" in resp
+    channels = await p_connection.redis.pubsub_channels()
+    assert not channels
+    await p_connection.close()
+
+
+@pytest.mark.asyncio  # type: ignore[misc]
+async def test_cancelled_confirmed() -> None:
+    "test cancelling a confirmed message"
+    p_connection = await Client.connect(TEST_URL)
+    await p_connection.redis.delete("mystream")
+    my_producer = await p_connection.producer("mystream")
+    # no consumer
+    coro = my_producer.addConfirmedMessage("msg")
+    try:
+        await asyncio.wait_for(coro, timeout=0.01)
+    except asyncio.TimeoutError:
+        channels = await p_connection.redis.pubsub_channels()
+        assert not channels
+    await p_connection.close()
