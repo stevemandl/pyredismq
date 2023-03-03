@@ -72,7 +72,9 @@ class Client:
         # we are 'connecting' but not really until the PING
         client.status = "connecting"
 
-        # create a connection pool
+        # create a blocking connection pool to wait for a connection to become available
+        # rather than raising an exception
+        # see https://aioredis.readthedocs.io/en/latest/api/low-level/#aioredis.connection.BlockingConnectionPool
         pool = aioredis.BlockingConnectionPool.from_url(
             address, max_connections=10, decode_responses=True
         )
