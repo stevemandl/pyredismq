@@ -71,9 +71,6 @@ class Producer:
             except TypeError as err:
                 Producer.log_debug("    - type error %s", channel_id)
                 response = {"message": "Type Error", "err": err}
-            except asyncio.CancelledError as err:
-                Producer.log_debug("    - cancelled %s", channel_id)
-                response = {"message": "Cancelled Error", "err": err}
             finally:
                 Producer.log_debug("    - finally %s", channel_id)
                 await self.client.pubsub.unsubscribe(channel_id)
