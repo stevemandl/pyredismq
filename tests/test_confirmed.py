@@ -233,7 +233,8 @@ async def test_confirmed_timeout() -> None:
     assert resp["message"] == "Timeout Error"
     assert "err" in resp
     channels = await p_connection.redis.pubsub_channels()
-    assert not channels
+    for channel in channels:
+        assert (await p_connection.redis.execute_command('PUBSUB', 'NUMSUB', channel))[1] == 0
     await p_connection.close()
 
 
@@ -249,5 +250,6 @@ async def test_cancelled_confirmed() -> None:
         await asyncio.wait_for(coro, timeout=0.01)
     except asyncio.TimeoutError:
         channels = await p_connection.redis.pubsub_channels()
-        assert not channels
+        for channel in channels:
+            assert (await p_connection.redis.execute_command('PUBSUB', 'NUMSUB', channel))[1] == 0
     await p_connection.close()
