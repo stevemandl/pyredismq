@@ -64,7 +64,8 @@ class Producer:
             Producer.log_debug("_handler json_message: %r", json_message)
             response = None
             try:
-                response = json.loads(json_message["data"])
+                if json_message:
+                    response = json.loads(json_message["data"])
             except ValueError as err:
                 Producer.log_debug("    - value/decoding error %s", channel_id)
                 response = {"message": "JSON Decoding Error", "err": err}
@@ -74,7 +75,9 @@ class Producer:
             finally:
                 Producer.log_debug("    - finally %s", channel_id)
                 await self.client.pubsub.unsubscribe(channel_id)
+                Producer.log_debug("    - unsubscribed %s", channel_id)
                 if not fut.cancelled():
+                    Producer.log_debug("    -setting result %s", response)
                     fut.set_result(response)
 
         return _handler
@@ -122,25 +125,29 @@ class Producer:
         # start listening for a response
         _handler = self.get_handler(response_channel_id, future)
         kwargs = {response_channel_id: _handler}
-        await self.client.pubsub.subscribe(**kwargs)
-        Producer.log_debug("    - subscribed")
-
-        # put the request into the stream
-        message_id: str = await self.client.redis.xadd(
-            self.stream_name, payload, maxlen=self.maxlen
-        )
-        Producer.log_debug("    - message_id: %r", message_id)
-        # future will get the result set by the handler when the response is published
         try:
+            await self.client.pubsub.subscribe(**kwargs)
+            Producer.log_debug("    - subscribed")
+
+            # put the request into the stream
+            message_id: str = await self.client.redis.xadd(
+                self.stream_name, payload, maxlen=self.maxlen
+            )
+            Producer.log_debug("    - message_id: %r", message_id)
+            # future will get the result set by the handler when the response is published
             resp = await asyncio.wait_for(future, self.timeout)
         except asyncio.TimeoutError as err:
             Producer.log_debug("    - timeout waiting for future: %r", err)
             await _handler()
             resp = {"message": "Timeout Error", "err": err}
         except asyncio.CancelledError as err:
-            Producer.log_debug("    - cancelled while waiting for future %r", err)
+            Producer.log_debug("    - cancelled %r", err)
             await _handler()
             resp = {"message": "Cancelled Error", "err": err}
+        except BaseException as err:
+            #Producer.log_debug("    - unexpected error %r", err)
+            await _handler()
+            resp = {"message": "Unexpected Error", "err": err}
         return resp
 
     # pylint: disable=invalid-name
