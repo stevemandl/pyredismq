@@ -32,6 +32,8 @@ class Client:
     status: str
     namespace: str
     redis: Any
+    pubsub: Any
+    sub_task: Any
 
     payloads: Set[Any]
     payloads_updated: asyncio.Condition
@@ -70,16 +72,21 @@ class Client:
         # we are 'connecting' but not really until the PING
         client.status = "connecting"
 
-        # create a connection pool
-        client.redis = aioredis.from_url(
+        # create a blocking connection pool to wait for a connection to become available
+        # rather than raising an exception
+        # see https://aioredis.readthedocs.io/en/latest/api/low-level/#aioredis.connection.BlockingConnectionPool
+        pool = aioredis.BlockingConnectionPool.from_url(
             address, max_connections=10, decode_responses=True
         )
+        client.redis = aioredis.Redis(connection_pool=pool)
         Client.log_debug("    - redis: %s", client.redis)
 
         # try to ping it
         rslt = await client.redis.ping()
         Client.log_debug("    - ping: %r", rslt)
 
+        client.pubsub = client.redis.pubsub(ignore_subscribe_messages=True)
+        client.sub_task = asyncio.get_running_loop().create_task(client.pubsub.run())
         client.status = "ready"
 
         return client
@@ -99,8 +106,17 @@ class Client:
         # wait for the event that says no more pending
         Client.log_debug(f"    - payloads: {self.payloads}")
         await self.payloads_event.wait()
+        self.sub_task.cancel()
+        try:
+            await self.sub_task
+        except asyncio.CancelledError:
+            Client.log_debug(f"    - sub_task cancelled")
+        await self.pubsub.close()
+        Client.log_debug(f"    - pubsub closed")
         await self.redis.close()
+        Client.log_debug(f"    - redis closed")
         await self.redis.connection_pool.disconnect()
+        Client.log_debug(f"    - connection_pool disconnected")
 
         self.status = "closed"
 
