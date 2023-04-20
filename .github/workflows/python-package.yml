@@ -19,6 +19,7 @@ jobs:
           - 6379/tcp
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.8", "3.9"]
     steps:
@@ -39,6 +40,7 @@ jobs:
       run: |
         pipenv run codecov
   build-n-publish:
+    needs: test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
