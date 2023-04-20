@@ -6,8 +6,8 @@ name: Python package
 on:
   push:
     branches: [ "main" ]
+    tags: *
   pull_request:
-    branches: [ "main" ]
 
 jobs:
   test: 
@@ -40,6 +40,7 @@ jobs:
       run: |
         pipenv run codecov
   build-n-publish:
+    if: github.ref_name == 'main'
     needs: test
     runs-on: ubuntu-latest
     steps:
