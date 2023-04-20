@@ -129,6 +129,7 @@ class Consumer:  # pylint: disable=too-few-public-methods
                 "block": self.xread_timeout,
                 "streams": {self.stream_name: latest_id},
             }
+            messages = None
             try:
                 messages = await self.client.redis.xreadgroup(**args)
                 Consumer.log_debug("    - messages: %r", messages)

@@ -55,6 +55,12 @@ pipenv install --dev
 pipenv run pytest
 ```
 
+debugging:
+
+```console
+export REDISMQ=DEBUG
+...
+```
 ## Getting Started
 
 RedisMQ needs to connect to an existing redis server, so you will need the address and port of the server you want to use. RedisMQ also stores global state in the redis server. By default the namespace used for global keys is rmq:*. If you need to change this so it does not conflict with other data stored in redis, the configuration parameter redismq_namespace should be set to something different.
