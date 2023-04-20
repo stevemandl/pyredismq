@@ -40,7 +40,7 @@ jobs:
       run: |
         pipenv run codecov
   build-n-publish:
-    if: if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
     needs: test
     runs-on: ubuntu-latest
     steps:
