@@ -8,10 +8,14 @@ import json
 from functools import partial
 
 from typing import TYPE_CHECKING, Any, Dict, TypedDict, Callable, Optional
-from redis import Connection # type: ignore[attr-defined]
+from redis import Connection  # type: ignore[attr-defined]
 
 from .debugging import debugging
-Client = TypedDict('Client', redis=Connection)
+
+
+class Client(TypedDict):
+    redis: Connection
+
 
 @debugging
 class Consumer:  # pylint: disable=too-few-public-methods
@@ -219,8 +223,9 @@ class Payload:
             )
             Payload.log_debug("    - published json")
 
+
 if TYPE_CHECKING:
     # class is declared as generic in stubs but not at runtime
-    PayloadFuture = asyncio.Future[Payload] # type: ignore
+    PayloadFuture = asyncio.Future[Payload]  # type: ignore
 else:
     PayloadFuture = asyncio.Future

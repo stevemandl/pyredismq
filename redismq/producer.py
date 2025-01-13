@@ -11,14 +11,16 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, TypedDict, Optional, cast
 from redis import Connection  # type: ignore[attr-defined]
 from .debugging import debugging
 
-Client = TypedDict("Client", redis=Connection)
-
 # class is declared as generic in stubs but not at runtime
 AnyFuture = asyncio.Future
 
 # settings
 MAXLEN = 100
 TIMEOUT = 10.0
+
+
+class Client(TypedDict):
+    redis: Connection
 
 
 @debugging
@@ -145,7 +147,7 @@ class Producer:
             await _handler()
             resp = {"message": "Cancelled Error", "err": err}
         except BaseException as err:
-            #Producer.log_debug("    - unexpected error %r", err)
+            # Producer.log_debug("    - unexpected error %r", err)
             await _handler()
             resp = {"message": "Unexpected Error", "err": err}
         return resp

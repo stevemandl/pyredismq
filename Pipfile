@@ -4,16 +4,16 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-pytest = {version=">=7.1.1"}
-pytest-asyncio = "*"
-pytest-cov = {version=">=3.0"}
+pytest = {version=">=8.3"}
+pytest-asyncio = {version=">=0.25"}
+pytest-cov = {version=">=6.0"}
 pylint = "*"
 pytest-timeouts = {version=">=1.2.1"}
 codecov = "*"
 pytest-repeat = "*"
 
 [packages]
-redis = {version=">=4.4"}
+redis = {version=">=5.2"}
 
 [requires]
 python_version = "3"

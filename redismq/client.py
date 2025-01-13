@@ -111,9 +111,9 @@ class Client:
             await self.sub_task
         except asyncio.CancelledError:
             Client.log_debug(f"    - sub_task cancelled")
-        await self.pubsub.close()
+        await self.pubsub.aclose()
         Client.log_debug(f"    - pubsub closed")
-        await self.redis.close()
+        await self.redis.aclose()
         Client.log_debug(f"    - redis closed")
         await self.redis.connection_pool.disconnect()
         Client.log_debug(f"    - connection_pool disconnected")

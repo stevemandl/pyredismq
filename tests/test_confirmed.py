@@ -8,22 +8,6 @@ from redismq.debugging import debugging
 from redismq import Client, Producer, Consumer
 
 
-@pytest.fixture
-def event_loop():
-    """
-    This special event loop fixture overriding the default one in pytest-asyncio
-    allows canceled tasks a chance to process the CancelledError that is thrown
-    into the task, otherwise the tests will pass but it generates "Task was
-    destroyed but it is pending!" messages when the loop is stopped.
-
-    https://docs.python.org/3/library/asyncio-task.html#asyncio.Task.cancel
-    """
-    loop = asyncio.get_event_loop()
-    yield loop
-    loop.call_soon(loop.stop)
-    loop.run_forever()
-
-
 async def send_a_confirmed_message(my_producer: Producer, delay: int = 0) -> None:
     "test confirmed message"
     await asyncio.sleep(delay)
@@ -232,14 +216,15 @@ async def test_confirmed_timeout() -> None:
     resp = await my_producer.addConfirmedMessage(f"message to nowhere")
     assert resp["message"] == "Timeout Error"
     assert "err" in resp
-# commented out because redis does not reliably report no subscribers 
-# even though the producer unsubscribed    
-#    channels = await p_connection.redis.pubsub_channels()
-#    for channel in channels:
-        # to force redis to update the channel list for this connection
-#        await p_connection.redis.publish(channel, "blah")
-#        assert (await p_connection.redis.execute_command('PUBSUB', 'NUMSUB', channel))[1] == 0
+    # commented out because redis does not reliably report no subscribers
+    # even though the producer unsubscribed
+    #    channels = await p_connection.redis.pubsub_channels()
+    #    for channel in channels:
+    # to force redis to update the channel list for this connection
+    #        await p_connection.redis.publish(channel, "blah")
+    #        assert (await p_connection.redis.execute_command('PUBSUB', 'NUMSUB', channel))[1] == 0
     await p_connection.close()
+
 
 @debugging
 @pytest.mark.asyncio  # type: ignore[misc]
@@ -254,11 +239,11 @@ async def test_cancelled_confirmed() -> None:
         await asyncio.wait_for(coro, timeout=0.01)
     except asyncio.TimeoutError:
         pass
-# commented out because redis does not reliably report no subscribers 
-# even though the producer unsubscribed    
-#        channels = await p_connection.redis.pubsub_channels()
-#        while channels:
-#            print(f"addConfirmed running: {coro.cr_running} channels: {channels}")
-#            await asyncio.sleep(.01)
-#            channels = await p_connection.redis.pubsub_channels()
+    # commented out because redis does not reliably report no subscribers
+    # even though the producer unsubscribed
+    #        channels = await p_connection.redis.pubsub_channels()
+    #        while channels:
+    #            print(f"addConfirmed running: {coro.cr_running} channels: {channels}")
+    #            await asyncio.sleep(.01)
+    #            channels = await p_connection.redis.pubsub_channels()
     await p_connection.close()
